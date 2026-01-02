@@ -1,0 +1,13 @@
+geopandas
+datashader
+holoviews
+colorcet
+spatialpandas
+fastparquet
+pyarrow
+requests
+shapely
+fiona
+pillow
+matplotlib
+pyrosm
