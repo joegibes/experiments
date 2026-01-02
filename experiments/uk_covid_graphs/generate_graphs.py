@@ -21,18 +21,17 @@ def get_vaccination_category(status):
     else:
         return 'Vaccinated'
 
-def process_data(df, year, month):
-    # Filter by date
-    # Note: Month is string in ONS file (e.g., 'December')
-    # Year is numeric (2022)
-
-    # Check if we need to map numeric month to string if input is different,
-    # but here we'll pass string.
-
-    subset = df[(df['Year'] == year) & (df['Month'] == month)].copy()
+def process_data(df, year, month=None):
+    # If month is None, process full year
+    if month:
+        subset = df[(df['Year'] == year) & (df['Month'] == month)].copy()
+        period_name = f"{month} {year}"
+    else:
+        subset = df[df['Year'] == year].copy()
+        period_name = f"Full Year {year}"
 
     if subset.empty:
-        print(f"No data for {month} {year}")
+        print(f"No data for {period_name}")
         return None
 
     # Filter for COVID deaths
@@ -49,6 +48,7 @@ def process_data(df, year, month):
     subset['Person-years'] = pd.to_numeric(subset['Person-years'], errors='coerce').fillna(0)
 
     # Group by Target Age and Status
+    # This sums up deaths and person-years across all selected months
     grouped = subset.groupby(['Target_Age', 'Target_Status'])[['Count of deaths', 'Person-years']].sum().reset_index()
 
     # Calculate Rate per 100,000
@@ -99,13 +99,23 @@ def main():
 
     # Year-end 2022 (December 2022)
     print("Processing December 2022...")
-    data_2022 = process_data(df, 2022, 'December')
-    plot_graph(data_2022, 'COVID-19 Death Rates by Vaccination Status - Dec 2022 (ONS Data)', 'deaths_dec_2022.png')
+    data_dec_2022 = process_data(df, 2022, 'December')
+    plot_graph(data_dec_2022, 'COVID-19 Death Rates by Vaccination Status - Dec 2022 (ONS Data)', 'deaths_dec_2022.png')
+
+    # Full Year 2022
+    print("Processing Full Year 2022...")
+    data_2022 = process_data(df, 2022)
+    plot_graph(data_2022, 'COVID-19 Death Rates by Vaccination Status - Full Year 2022 (ONS Data)', 'deaths_2022_full_year.png')
 
     # Year-end 2023 (Not available, using May 2023)
     print("Processing May 2023 (latest available)...")
-    data_2023 = process_data(df, 2023, 'May')
-    plot_graph(data_2023, 'COVID-19 Death Rates by Vaccination Status - May 2023 (Latest Available)', 'deaths_may_2023.png')
+    data_may_2023 = process_data(df, 2023, 'May')
+    plot_graph(data_may_2023, 'COVID-19 Death Rates by Vaccination Status - May 2023 (Latest Available)', 'deaths_may_2023.png')
+
+    # Full Year 2023 (Partial: Jan-May)
+    print("Processing Full Year 2023 (Partial)...")
+    data_2023 = process_data(df, 2023)
+    plot_graph(data_2023, 'COVID-19 Death Rates by Vaccination Status - 2023 (Jan-May) (ONS Data)', 'deaths_2023_full_year.png')
 
     # 2024
     print("Data for 2024 is not available in the dataset.")

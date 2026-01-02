@@ -15,19 +15,23 @@ The UK Health Security Agency (UKHSA) and ONS have made significant changes to d
 ## Generated Graphs
 Based on the available ONS data (`deaths_may_2023.xlsx`), we have generated "Deaths rate per 100,000" graphs for:
 
-1.  **Year-End 2022 (December 2022)**: `deaths_dec_2022.png`
-2.  **Year-End 2023 (Proxy: May 2023)**: `deaths_may_2023.png`
-    *   *Note: This is the latest data available. Data for year-end 2023 and 2024 does not exist in this dataset.*
+1.  **2022 Full Year**: `deaths_2022_full_year.png` (Aggregated data Jan-Dec 2022)
+2.  **2022 Year-End (December)**: `deaths_dec_2022.png`
+3.  **2023 Full Year (Partial)**: `deaths_2023_full_year.png` (Aggregated data Jan-May 2023)
+4.  **2023 Year-End (Proxy: May)**: `deaths_may_2023.png`
+    *   *Note: This is the latest data available. Data for late 2023 and 2024 does not exist in this dataset.*
 
 ## Methodology
 -   **Source**: ONS "Deaths by vaccination status, England" dataset (April 2021 to May 2023).
 -   **Age Groups**: Aggregated to match the original request as closely as possible (`18-39`, `40-49`, `50-59`, `60-69`, `70+`). Note that `<18` is not included due to data sparseness/privacy suppression in the ONS dataset for this specific breakdown.
 -   **Vaccination Status**:
     -   **Unvaccinated**: Those with no record of vaccination.
-    -   **Vaccinated**: Aggregated from all other categories (1st dose, 2nd dose, 3rd/Booster, etc.) to provide a broad "Vaccinated" group for comparison, as "Double Vaccinated" is no longer the standard for "fully vaccinated" in 2022/23.
+    -   **Vaccinated**: Aggregated from all other categories (1st dose, 2nd dose, 3rd/Booster, etc.) to provide a broad "Vaccinated" group for comparison.
 -   **Rate Calculation**: `(Count of deaths / Person-years) * 100,000`.
 
 ## Files
 -   `generate_graphs.py`: Python script used to process the ONS Excel file and generate the plots.
+-   `deaths_2022_full_year.png`: Graph for full year 2022.
+-   `deaths_2023_full_year.png`: Graph for Jan-May 2023.
 -   `deaths_dec_2022.png`: Graph for December 2022.
 -   `deaths_may_2023.png`: Graph for May 2023.
