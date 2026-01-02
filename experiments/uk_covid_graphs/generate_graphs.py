@@ -96,11 +96,11 @@ def create_dashboard(deaths_data, title, filename):
 
         if 'Unvaccinated' in cols:
             bars1 = ax_deaths.bar(x - width/2, pivot['Unvaccinated'], width, label='Unvaccinated', color=colors['Unvaccinated'])
-            ax_deaths.bar_label(bars1, fmt='%.0f', padding=3)
+            ax_deaths.bar_label(bars1, fmt='%.1f', padding=3)
 
         if 'Vaccinated' in cols:
             bars2 = ax_deaths.bar(x + width/2, pivot['Vaccinated'], width, label='Vaccinated', color=colors['Vaccinated'])
-            ax_deaths.bar_label(bars2, fmt='%.0f', padding=3)
+            ax_deaths.bar_label(bars2, fmt='%.1f', padding=3)
 
         ax_deaths.set_ylabel('Deaths rate\nper 100,000')
         ax_deaths.set_xlabel('Age Group')
@@ -145,6 +145,14 @@ def main():
     print("Generating 2024 Dashboard...")
     # No data for 2024, pass None
     create_dashboard(None, 'UK COVID-19 Outcomes by Vaccination Status - 2024', 'uk_covid_data_2024.png')
+
+    # 4. Recreation of Reference Image (Sept 2021)
+    # The reference image covers "Weeks 37-40 of 2021".
+    # Sept 2021 roughly covers weeks 35-39. Oct is 39-43.
+    # We will use September 2021 ONS data as the closest monthly proxy.
+    print("Generating Recreation Dashboard (Sept 2021)...")
+    data_sep_2021 = process_data(df, 2021, 'September')
+    create_dashboard(data_sep_2021, 'RECREATION ATTEMPT: UK COVID-19 Outcomes (Sept 2021 Proxy)', 'uk_covid_data_recreation_sept_2021.png')
 
 if __name__ == "__main__":
     main()

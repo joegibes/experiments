@@ -22,6 +22,9 @@ Files:
 1.  **2022 Dashboard**: `uk_covid_data_2022.png` (Deaths data aggregated for Full Year 2022)
 2.  **2023 Dashboard**: `uk_covid_data_2023.png` (Deaths data aggregated for Jan-May 2023)
 3.  **2024 Dashboard**: `uk_covid_data_2024.png` (Empty, as no data exists)
+4.  **Recreation Attempt (Sept 2021)**: `uk_covid_data_recreation_sept_2021.png`
+    -   This graph attempts to recreate the reference image (Weeks 37-40 2021) using ONS data for September 2021.
+    -   **Note on Differences**: The reference image uses UKHSA data, while this recreation uses ONS data. Discrepancies in rates are expected due to different methodologies (e.g., ONS uses "Person-years" and links to Census 2011/2021, while UKHSA used NIMS population estimates). However, the general trend (higher death rates in unvaccinated older populations) is consistent.
 
 ## Methodology
 -   **Source**: ONS "Deaths by vaccination status, England" dataset (April 2021 to May 2023).
@@ -36,3 +39,4 @@ Files:
 -   `uk_covid_data_2022.png`: Dashboard for 2022.
 -   `uk_covid_data_2023.png`: Dashboard for 2023.
 -   `uk_covid_data_2024.png`: Dashboard for 2024.
+-   `uk_covid_data_recreation_sept_2021.png`: Proxy recreation of the reference image period.
