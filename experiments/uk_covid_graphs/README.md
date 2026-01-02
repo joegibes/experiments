@@ -13,13 +13,15 @@ The UK Health Security Agency (UKHSA) and ONS have made significant changes to d
 3.  **Deaths by Vaccination Status**: ONS published "Deaths by vaccination status, England" but this series was paused in July 2022 and updated later. The final update covers data up to **May 2023**. ONS stated: "We will no longer be updating the Deaths by vaccination status analysis, England series."
 
 ## Generated Graphs
-Based on the available ONS data (`deaths_may_2023.xlsx`), we have generated "Deaths rate per 100,000" graphs for:
+The generated graphs (`uk_covid_data_*.png`) follow the requested 3-row layout (Cases, Hospitalisations, Deaths).
 
-1.  **2022 Full Year**: `deaths_2022_full_year.png` (Aggregated data Jan-Dec 2022)
-2.  **2022 Year-End (December)**: `deaths_dec_2022.png`
-3.  **2023 Full Year (Partial)**: `deaths_2023_full_year.png` (Aggregated data Jan-May 2023)
-4.  **2023 Year-End (Proxy: May)**: `deaths_may_2023.png`
-    *   *Note: This is the latest data available. Data for late 2023 and 2024 does not exist in this dataset.*
+-   **Cases & Hospitalisations**: These sections are included but marked as "Data Discontinued" for 2022, 2023, and 2024, reflecting the cessation of these specific data series by the UK government.
+-   **Deaths**: These sections are populated with available ONS data.
+
+Files:
+1.  **2022 Dashboard**: `uk_covid_data_2022.png` (Deaths data aggregated for Full Year 2022)
+2.  **2023 Dashboard**: `uk_covid_data_2023.png` (Deaths data aggregated for Jan-May 2023)
+3.  **2024 Dashboard**: `uk_covid_data_2024.png` (Empty, as no data exists)
 
 ## Methodology
 -   **Source**: ONS "Deaths by vaccination status, England" dataset (April 2021 to May 2023).
@@ -31,7 +33,6 @@ Based on the available ONS data (`deaths_may_2023.xlsx`), we have generated "Dea
 
 ## Files
 -   `generate_graphs.py`: Python script used to process the ONS Excel file and generate the plots.
--   `deaths_2022_full_year.png`: Graph for full year 2022.
--   `deaths_2023_full_year.png`: Graph for Jan-May 2023.
--   `deaths_dec_2022.png`: Graph for December 2022.
--   `deaths_may_2023.png`: Graph for May 2023.
+-   `uk_covid_data_2022.png`: Dashboard for 2022.
+-   `uk_covid_data_2023.png`: Dashboard for 2023.
+-   `uk_covid_data_2024.png`: Dashboard for 2024.

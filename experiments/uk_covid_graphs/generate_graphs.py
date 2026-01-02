@@ -48,40 +48,74 @@ def process_data(df, year, month=None):
     subset['Person-years'] = pd.to_numeric(subset['Person-years'], errors='coerce').fillna(0)
 
     # Group by Target Age and Status
-    # This sums up deaths and person-years across all selected months
     grouped = subset.groupby(['Target_Age', 'Target_Status'])[['Count of deaths', 'Person-years']].sum().reset_index()
 
     # Calculate Rate per 100,000
-    # Avoid division by zero
     grouped['Rate'] = grouped.apply(lambda x: (x['Count of deaths'] / x['Person-years'] * 100000) if x['Person-years'] > 0 else 0, axis=1)
 
     return grouped
 
-def plot_graph(data, title, filename):
-    if data is None:
-        return
+def create_dashboard(deaths_data, title, filename):
+    # Create figure with 3 subplots
+    fig, axes = plt.subplots(3, 1, figsize=(10, 15), sharex=True)
+    fig.suptitle(title, fontsize=16)
 
-    # Pivot for plotting
-    pivot = data.pivot(index='Target_Age', columns='Target_Status', values='Rate')
-
-    # Ensure all age groups are present and sorted
     age_order = ['18-39', '40-49', '50-59', '60-69', '70+']
-    pivot = pivot.reindex(age_order)
 
-    # Plot
-    ax = pivot.plot(kind='bar', figsize=(10, 6), color=['red', 'blue'])
+    # --- Plot 1: Case Rates ---
+    ax_cases = axes[0]
+    ax_cases.set_ylabel('Case rate\nper 100,000')
+    ax_cases.set_title('Cases (Data Discontinued)')
+    ax_cases.text(0.5, 0.5, 'Case rate data by vaccination status\ndiscontinued by UKHSA in April 2022',
+                  ha='center', va='center', transform=ax_cases.transAxes, fontsize=12, color='gray')
+    ax_cases.set_yticks([]) # Hide y-ticks as no data
 
-    ax.set_ylabel('Deaths rate per 100,000')
-    ax.set_xlabel('Age Group')
-    ax.set_title(title)
-    plt.xticks(rotation=0)
-    plt.grid(axis='y', linestyle='--', alpha=0.7)
+    # --- Plot 2: Hospitalisation Rates ---
+    ax_hosp = axes[1]
+    ax_hosp.set_ylabel('Hospitalisation rate\nper 100,000')
+    ax_hosp.set_title('Hospitalisations (Data Discontinued)')
+    ax_hosp.text(0.5, 0.5, 'Hospitalisation rate data by vaccination status\ndiscontinued/incompatible format in 2022',
+                 ha='center', va='center', transform=ax_hosp.transAxes, fontsize=12, color='gray')
+    ax_hosp.set_yticks([])
 
-    # Add value labels
-    for container in ax.containers:
-        ax.bar_label(container, fmt='%.1f')
+    # --- Plot 3: Death Rates ---
+    ax_deaths = axes[2]
+    if deaths_data is not None:
+        pivot = deaths_data.pivot(index='Target_Age', columns='Target_Status', values='Rate')
+        pivot = pivot.reindex(age_order)
 
-    plt.tight_layout()
+        # Colors: Unvaccinated (Red), Vaccinated (Blue)
+        colors = {'Unvaccinated': '#AA0000', 'Vaccinated': '#0000AA'}
+
+        # Plot bars manually to control colors and order
+        x = np.arange(len(age_order))
+        width = 0.35
+
+        # Check if we have both columns
+        cols = pivot.columns
+
+        if 'Unvaccinated' in cols:
+            bars1 = ax_deaths.bar(x - width/2, pivot['Unvaccinated'], width, label='Unvaccinated', color=colors['Unvaccinated'])
+            ax_deaths.bar_label(bars1, fmt='%.0f', padding=3)
+
+        if 'Vaccinated' in cols:
+            bars2 = ax_deaths.bar(x + width/2, pivot['Vaccinated'], width, label='Vaccinated', color=colors['Vaccinated'])
+            ax_deaths.bar_label(bars2, fmt='%.0f', padding=3)
+
+        ax_deaths.set_ylabel('Deaths rate\nper 100,000')
+        ax_deaths.set_xlabel('Age Group')
+        ax_deaths.set_xticks(x)
+        ax_deaths.set_xticklabels(age_order)
+        ax_deaths.legend()
+        ax_deaths.grid(axis='y', linestyle='--', alpha=0.3)
+
+        # Remove top and right spines for style
+        ax_deaths.spines['top'].set_visible(False)
+        ax_deaths.spines['right'].set_visible(False)
+    else:
+        ax_deaths.text(0.5, 0.5, 'No Data Available', ha='center', va='center')
+
+    plt.tight_layout(rect=[0, 0.03, 1, 0.95]) # Adjust for suptitle
     plt.savefig(os.path.join(OUTPUT_DIR, filename))
     print(f"Saved {filename}")
     plt.close()
@@ -97,28 +131,20 @@ def main():
         print(f"Error reading Excel: {e}")
         return
 
-    # Year-end 2022 (December 2022)
-    print("Processing December 2022...")
-    data_dec_2022 = process_data(df, 2022, 'December')
-    plot_graph(data_dec_2022, 'COVID-19 Death Rates by Vaccination Status - Dec 2022 (ONS Data)', 'deaths_dec_2022.png')
-
-    # Full Year 2022
-    print("Processing Full Year 2022...")
+    # 1. Dashboard for Full Year 2022
+    print("Generating 2022 Dashboard...")
     data_2022 = process_data(df, 2022)
-    plot_graph(data_2022, 'COVID-19 Death Rates by Vaccination Status - Full Year 2022 (ONS Data)', 'deaths_2022_full_year.png')
+    create_dashboard(data_2022, 'UK COVID-19 Outcomes by Vaccination Status - 2022', 'uk_covid_data_2022.png')
 
-    # Year-end 2023 (Not available, using May 2023)
-    print("Processing May 2023 (latest available)...")
-    data_may_2023 = process_data(df, 2023, 'May')
-    plot_graph(data_may_2023, 'COVID-19 Death Rates by Vaccination Status - May 2023 (Latest Available)', 'deaths_may_2023.png')
-
-    # Full Year 2023 (Partial: Jan-May)
-    print("Processing Full Year 2023 (Partial)...")
+    # 2. Dashboard for Full Year 2023 (Jan-May)
+    print("Generating 2023 Dashboard...")
     data_2023 = process_data(df, 2023)
-    plot_graph(data_2023, 'COVID-19 Death Rates by Vaccination Status - 2023 (Jan-May) (ONS Data)', 'deaths_2023_full_year.png')
+    create_dashboard(data_2023, 'UK COVID-19 Outcomes by Vaccination Status - 2023 (Jan-May)', 'uk_covid_data_2023.png')
 
-    # 2024
-    print("Data for 2024 is not available in the dataset.")
+    # 3. Dashboard for 2024
+    print("Generating 2024 Dashboard...")
+    # No data for 2024, pass None
+    create_dashboard(None, 'UK COVID-19 Outcomes by Vaccination Status - 2024', 'uk_covid_data_2024.png')
 
 if __name__ == "__main__":
     main()
