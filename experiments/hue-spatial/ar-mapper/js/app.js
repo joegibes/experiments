@@ -16,12 +16,17 @@ const state = {
     // Mapping Data
     floorHeight: null,
     ceilingHeight: 2.44, // Default 8'
-    pins: [], // Array of { id, anchor, mesh, position: {x, y, z} }
+    pins: [], // Array of { id, mesh, relativePos: {x, y, z} }
+    corners: [], // Array of { mesh, position: {x, y, z} } for room perimeter
 
     // UI state
-    mode: 'intro', // intro, floor-setup, pinning, results
+    mode: 'intro', // intro, floor-setup, corner-mapping, pinning, results
     isDebugOpen: false,
-    isTargeting: false
+    isTargeting: false,
+
+    // Auto-floor detection
+    autoFloorStartTime: null,
+    autoFloorThreshold: 1000 // 1 second
 };
 
 // DOM Elements
@@ -32,6 +37,7 @@ const elements = {
     debugPanel: document.getElementById('debug-panel'),
 
     floorSetupPanel: document.getElementById('floor-setup-panel'),
+    cornerMappingPanel: document.getElementById('corner-mapping-panel'),
     pinningPanel: document.getElementById('pinning-panel'),
 
     startBtn: document.getElementById('start-ar-btn'),
@@ -41,6 +47,13 @@ const elements = {
 
     setFloorBtn: document.getElementById('set-floor-manual-btn'),
     skipFloorBtn: document.getElementById('skip-floor-btn'),
+
+    // Corner mapping
+    undoCornerBtn: document.getElementById('undo-corner-btn'),
+    doneCornersBtn: document.getElementById('done-corners-btn'),
+    skipCornersBtn: document.getElementById('skip-corners-btn'),
+    cornerCount: document.getElementById('corner-count'),
+
     undoPinBtn: document.getElementById('undo-pin-btn'),
     finishBtn: document.getElementById('finish-btn'),
 
@@ -91,8 +104,23 @@ function setupEventListeners() {
     elements.toggleDebugBtn.addEventListener('click', () => setDebugPanel(true));
     elements.closeDebugBtn.addEventListener('click', () => setDebugPanel(false));
 
-    elements.setFloorBtn.addEventListener('click', () => setFloor(state.reticle.position.y));
+    elements.setFloorBtn.addEventListener('click', () => setFloor());
     elements.skipFloorBtn.addEventListener('click', () => setFloor(0)); // Assume origin is floor
+
+    // Corner mapping buttons
+    elements.undoCornerBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        undoCorner();
+    });
+    elements.doneCornersBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        finishCorners();
+    });
+    elements.skipCornersBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        setMode('pinning');
+        showToast('Skipped room outline');
+    });
 
     // Fix Undo bug: Stop propagation on buttons
     elements.undoPinBtn.addEventListener('click', (e) => {
@@ -106,12 +134,20 @@ function setupEventListeners() {
         showResults(); // No confirmation needed
     });
 
-    // Handle taps in pinning mode - IGNORE button clicks
+    elements.copyJsonBtn.addEventListener('click', copyToClipboard);
+    elements.downloadJsonBtn.addEventListener('click', downloadJSON);
+    elements.newSessionBtn.addEventListener('click', () => window.location.reload());
+
+    // Handle taps - IGNORE button clicks
     window.addEventListener('click', (e) => {
         // If clicking a button or UI element, ignore
-        if (e.target.closest('button') || e.target.closest('.action-btn') || e.target.closest('.icon-btn')) return;
+        if (e.target.closest('button') || e.target.closest('.action-btn') || e.target.closest('.icon-btn') || e.target.closest('.debug-panel')) return;
 
-        if (state.mode === 'pinning' && state.isTargeting) {
+        if (state.mode === 'floor-setup' && state.isTargeting) {
+            setFloor();
+        } else if (state.mode === 'corner-mapping' && state.isTargeting) {
+            placeCorner();
+        } else if (state.mode === 'pinning' && state.isTargeting) {
             placePin();
         }
     });
@@ -252,32 +288,32 @@ function setupThreeJS() {
 function setMode(mode) {
     state.mode = mode;
     elements.floorSetupPanel.classList.toggle('active', mode === 'floor-setup');
+    elements.cornerMappingPanel.classList.toggle('active', mode === 'corner-mapping');
     elements.pinningPanel.classList.toggle('active', mode === 'pinning');
-
-    // In pinning mode, we want the "Finish" button visible
-    // We'll move it to top-right in CSS
 }
 
-function setFloor() {
-    // improved floor logic
-    if (!state.reticle.visible) {
-        showToast('Please find a surface first!', 'error');
-        return;
+function setFloor(overrideY = null) {
+    let y = overrideY;
+
+    if (y === null) {
+        if (!state.reticle.visible) {
+            showToast('Please find a surface first!', 'error');
+            return;
+        }
+        const position = new THREE.Vector3();
+        position.setFromMatrixPosition(state.reticle.matrix);
+        y = position.y;
     }
 
-    // The Reticle is ALREADY at the hit location.
-    // We want this Y to be our new "0".
-    const position = new THREE.Vector3();
-    position.setFromMatrixPosition(state.reticle.matrix);
-
-    state.floorHeight = position.y;
+    state.floorHeight = y;
+    state.autoFloorStartTime = null; // Reset auto-floor timer
 
     elements.debugFloor.textContent = state.floorHeight.toFixed(3) + 'm (raw)';
     elements.debugCeiling.textContent = (state.floorHeight + state.ceilingHeight).toFixed(2) + 'm';
 
-    setMode('pinning');
+    setMode('corner-mapping'); // Go to corner mapping first
     visualizeFloor(state.floorHeight);
-    showToast('Floor Verified! height=0');
+    showToast(`Floor set at ${y.toFixed(2)}m. Now outline your room!`);
 }
 
 async function placePin() {
@@ -322,6 +358,97 @@ async function placePin() {
     // elements.finishBtn.disabled = false; // Always enabled now
 
     showToast(`Pinned #${pinId} @ ${heightFromFloor.toFixed(2)}m`);
+}
+
+// Corner Mapping Functions
+function placeCorner() {
+    if (!state.reticle.visible) return;
+
+    const position = new THREE.Vector3();
+    position.setFromMatrixPosition(state.reticle.matrix);
+
+    // Place corner at floor height
+    const cornerPos = {
+        x: position.x,
+        y: state.floorHeight,
+        z: position.z
+    };
+
+    // Visual marker
+    const cornerGeom = new THREE.CylinderGeometry(0.03, 0.03, 0.15, 8);
+    const cornerMat = new THREE.MeshStandardMaterial({
+        color: 0x10b981,
+        emissive: 0x10b981,
+        emissiveIntensity: 0.5
+    });
+    const cornerMesh = new THREE.Mesh(cornerGeom, cornerMat);
+    cornerMesh.position.set(cornerPos.x, cornerPos.y + 0.075, cornerPos.z);
+    state.scene.add(cornerMesh);
+
+    // If we have at least one corner, draw a line to the previous one
+    if (state.corners.length > 0) {
+        const prev = state.corners[state.corners.length - 1].position;
+        const points = [
+            new THREE.Vector3(prev.x, prev.y + 0.01, prev.z),
+            new THREE.Vector3(cornerPos.x, cornerPos.y + 0.01, cornerPos.z)
+        ];
+        const lineGeom = new THREE.BufferGeometry().setFromPoints(points);
+        const lineMat = new THREE.LineBasicMaterial({ color: 0x10b981, linewidth: 2 });
+        const line = new THREE.Line(lineGeom, lineMat);
+        state.scene.add(line);
+        cornerMesh.userData.line = line;
+    }
+
+    state.corners.push({
+        mesh: cornerMesh,
+        position: cornerPos
+    });
+
+    updateCornerCount();
+    elements.undoCornerBtn.disabled = false;
+
+    showToast(`Corner ${state.corners.length} placed`);
+}
+
+function undoCorner() {
+    if (state.corners.length === 0) return;
+
+    const corner = state.corners.pop();
+    state.scene.remove(corner.mesh);
+    if (corner.mesh.userData.line) {
+        state.scene.remove(corner.mesh.userData.line);
+    }
+
+    updateCornerCount();
+
+    if (state.corners.length === 0) {
+        elements.undoCornerBtn.disabled = true;
+    }
+
+    showToast('Removed last corner');
+}
+
+function finishCorners() {
+    if (state.corners.length >= 3) {
+        // Close the polygon by drawing a line from last to first
+        const first = state.corners[0].position;
+        const last = state.corners[state.corners.length - 1].position;
+        const points = [
+            new THREE.Vector3(last.x, last.y + 0.01, last.z),
+            new THREE.Vector3(first.x, first.y + 0.01, first.z)
+        ];
+        const lineGeom = new THREE.BufferGeometry().setFromPoints(points);
+        const lineMat = new THREE.LineBasicMaterial({ color: 0x10b981 });
+        const closingLine = new THREE.Line(lineGeom, lineMat);
+        state.scene.add(closingLine);
+    }
+
+    setMode('pinning');
+    showToast('Room outline complete! Now pin your lights.');
+}
+
+function updateCornerCount() {
+    elements.cornerCount.textContent = state.corners.length;
 }
 
 function undoLastPin() {
@@ -381,22 +508,35 @@ function render(timestamp, frame) {
             elements.heightVal.textContent = h.toFixed(2);
             document.getElementById('debug-cam-height').textContent = h.toFixed(2) + 'm';
         }
+
+        // Auto-floor detection: If in floor-setup mode and hitting a roughly horizontal surface
+        if (state.mode === 'floor-setup') {
+            // Check if the hit is roughly horizontal by examining the pose orientation
+            // For simplicity, we assume any stable hit for 1 second triggers auto-floor
+            if (state.autoFloorStartTime === null) {
+                state.autoFloorStartTime = timestamp;
+                document.getElementById('floor-detection-status').textContent = 'Floor detected! Hold steady...';
+            } else {
+                const elapsed = timestamp - state.autoFloorStartTime;
+                const progress = Math.min(1, elapsed / state.autoFloorThreshold);
+                document.getElementById('floor-detection-status').textContent =
+                    `Floor detected! ${Math.round(progress * 100)}%`;
+
+                if (elapsed >= state.autoFloorThreshold) {
+                    // Auto-set floor
+                    setFloor(currentY);
+                }
+            }
+        }
     } else {
         state.reticle.visible = false;
         state.isTargeting = false;
+        state.autoFloorStartTime = null; // Reset auto-floor timer
         document.getElementById('reticle').classList.remove('targeting');
-    }
 
-    // Plane Visualization
-    if (state.session && state.localReferenceSpace) {
-        // This is a simplified plane visualizer
-        // In a real app we would track planes by ID and update their geometry
-        // For PoC, we rely on the reticle aligning to them, which confirms detection
-        // But the user asked to SEE them.
-
-        // Note: Full mesh updates for planes is complex in vanilla Three.js without a helper library
-        // We will stick to the Reticle aligning for now, but ensure it aligns to everything.
-        // To truly "See" planes we'd need to iterate frame.detectedPlanes (if available in this mode)
+        if (state.mode === 'floor-setup') {
+            document.getElementById('floor-detection-status').textContent = 'Searching for floor...';
+        }
     }
 
     state.renderer.render(state.scene, state.camera);
@@ -618,8 +758,38 @@ function setupVisualizer() {
     if (state.pins.length > 0) {
         centerX = state.pins.reduce((sum, p) => sum + p.relativePos.x, 0) / state.pins.length;
         centerZ = state.pins.reduce((sum, p) => sum + p.relativePos.y, 0) / state.pins.length;
+    } else if (state.corners.length > 0) {
+        centerX = state.corners.reduce((sum, c) => sum + c.position.x, 0) / state.corners.length;
+        centerZ = state.corners.reduce((sum, c) => sum + c.position.z, 0) / state.corners.length;
     }
     pivot.position.set(-centerX, 0, -centerZ);
+
+    // Room Polygon from corners
+    if (state.corners.length >= 3) {
+        const cornerPoints = state.corners.map(c =>
+            new THREE.Vector3(c.position.x, 0.02, c.position.z)
+        );
+        // Close the polygon
+        cornerPoints.push(cornerPoints[0].clone());
+
+        const polygonGeom = new THREE.BufferGeometry().setFromPoints(cornerPoints);
+        const polygonMat = new THREE.LineBasicMaterial({ color: 0x10b981, linewidth: 2 });
+        const polygonLine = new THREE.Line(polygonGeom, polygonMat);
+        pivot.add(polygonLine);
+
+        // Also add corner markers
+        state.corners.forEach((c, i) => {
+            const markerGeom = new THREE.CylinderGeometry(0.03, 0.03, 0.1, 8);
+            const markerMat = new THREE.MeshStandardMaterial({
+                color: 0x10b981,
+                emissive: 0x10b981,
+                emissiveIntensity: 0.3
+            });
+            const marker = new THREE.Mesh(markerGeom, markerMat);
+            marker.position.set(c.position.x, 0.05, c.position.z);
+            pivot.add(marker);
+        });
+    }
 
     // Add Pins
     state.pins.forEach(p => {
