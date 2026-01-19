@@ -60,7 +60,8 @@ const elements = {
     debugPinsList: document.getElementById('debug-pins-list'),
 
     ceilingInput: document.getElementById('ceiling-height'),
-    toastContainer: document.getElementById('toast-container')
+    toastContainer: document.getElementById('toast-container'),
+    visualizerMount: document.getElementById('visualizer-mount')
 };
 
 // Initialize the app
@@ -428,6 +429,7 @@ function visualizeFloor(height) {
 }
 
 function onSessionEnd() {
+    state.renderer.setAnimationLoop(null); // Stop AR loop
     state.session = null;
     document.body.style.backgroundColor = ''; // Restore background
     elements.arOverlay.classList.remove('active');
@@ -498,6 +500,9 @@ function showResults() {
         };
 
         elements.jsonOutput.textContent = JSON.stringify(output, null, 2);
+
+        // Initialize 3D Visualizer
+        setupVisualizer();
     }
 }
 
@@ -542,6 +547,159 @@ function refreshDebugPinsList() {
     } else {
         state.pins.forEach(p => addPinToDebugList(p));
     }
+}
+
+/**
+ * 3D Room Visualizer
+ * Reconstructs the mapped space for review
+ */
+function setupVisualizer() {
+    const mount = elements.visualizerMount;
+    if (!mount) return;
+
+    // Clear previous if any
+    mount.innerHTML = '';
+
+    const width = mount.clientWidth;
+    const height = mount.clientHeight;
+
+    // Setup Scene
+    const scene = new THREE.Scene();
+    scene.background = new THREE.Color(0x0f172a);
+
+    const camera = new THREE.PerspectiveCamera(60, width / height, 0.1, 1000);
+    const renderer = new THREE.WebGLRenderer({ antialias: true });
+    renderer.setPixelRatio(window.devicePixelRatio);
+    renderer.setSize(width, height);
+    mount.appendChild(renderer.domElement);
+
+    // Lighting
+    const ambient = new THREE.AmbientLight(0xffffff, 0.6);
+    scene.add(ambient);
+    const directional = new THREE.DirectionalLight(0xffffff, 0.8);
+    directional.position.set(5, 10, 7);
+    scene.add(directional);
+
+    // Orbit Pivot
+    const pivot = new THREE.Group();
+    scene.add(pivot);
+
+    // Helper: Floor
+    const floorGeom = new THREE.PlaneGeometry(10, 10);
+    const floorMat = new THREE.MeshStandardMaterial({
+        color: 0x1e293b,
+        side: THREE.DoubleSide,
+        transparent: true,
+        opacity: 0.8
+    });
+    const floor = new THREE.Mesh(floorGeom, floorMat);
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = -0.01;
+    pivot.add(floor);
+
+    const grid = new THREE.GridHelper(10, 10, 0x475569, 0x334155);
+    pivot.add(grid);
+
+    // Ceiling Plane (Transparent)
+    const ceilGeom = new THREE.PlaneGeometry(10, 10);
+    const ceilMat = new THREE.MeshBasicMaterial({
+        color: 0x6366f1,
+        transparent: true,
+        opacity: 0.1,
+        side: THREE.DoubleSide
+    });
+    const ceil = new THREE.Mesh(ceilGeom, ceilMat);
+    ceil.rotation.x = Math.PI / 2;
+    ceil.position.y = state.ceilingHeight;
+    pivot.add(ceil);
+
+    // Center point of pins to center the view
+    let centerX = 0, centerZ = 0;
+    if (state.pins.length > 0) {
+        centerX = state.pins.reduce((sum, p) => sum + p.relativePos.x, 0) / state.pins.length;
+        centerZ = state.pins.reduce((sum, p) => sum + p.relativePos.y, 0) / state.pins.length;
+    }
+    pivot.position.set(-centerX, 0, -centerZ);
+
+    // Add Pins
+    state.pins.forEach(p => {
+        // Pin Sphere
+        const pinGeom = new THREE.SphereGeometry(0.04, 16, 16);
+        const pinMat = new THREE.MeshStandardMaterial({
+            color: 0x6366f1,
+            emissive: 0x6366f1,
+            emissiveIntensity: 0.5
+        });
+        const pin = new THREE.Mesh(pinGeom, pinMat);
+        // Correct mapping: x, y (depth/worldZ), z (height/worldY) 
+        // In this preview, world Y is Up.
+        pin.position.set(p.relativePos.x, p.relativePos.z, p.relativePos.y);
+        pivot.add(pin);
+
+        // Vertical Line from floor
+        const points = [];
+        points.push(new THREE.Vector3(p.relativePos.x, 0, p.relativePos.y));
+        points.push(new THREE.Vector3(p.relativePos.x, p.relativePos.z, p.relativePos.y));
+        const lineGeom = new THREE.BufferGeometry().setFromPoints(points);
+        const lineMat = new THREE.LineBasicMaterial({ color: 0x475569, transparent: true, opacity: 0.5 });
+        const line = new THREE.Line(lineGeom, lineMat);
+        pivot.add(line);
+    });
+
+    // Interaction logic
+    let isDragging = false;
+    let prevX = 0, prevY = 0;
+    let rotationY = Math.PI / 4;
+    let rotationX = 0.5;
+    let distance = 8;
+
+    function updateCamera() {
+        const x = distance * Math.sin(rotationY) * Math.cos(rotationX);
+        const y = distance * Math.sin(rotationX);
+        const z = distance * Math.cos(rotationY) * Math.cos(rotationX);
+
+        camera.position.set(x, y, z);
+        camera.lookAt(0, 0.5, 0);
+    }
+
+    function onMove(x, y) {
+        if (!isDragging) return;
+        const dx = x - prevX;
+        const dy = y - prevY;
+
+        rotationY -= dx * 0.01;
+        rotationX = Math.max(-Math.PI / 2.1, Math.min(Math.PI / 2.1, rotationX + dy * 0.01));
+
+        updateCamera();
+        prevX = x;
+        prevY = y;
+    }
+
+    mount.addEventListener('mousedown', e => { isDragging = true; prevX = e.clientX; prevY = e.clientY; });
+    window.addEventListener('mousemove', e => onMove(e.clientX, e.clientY));
+    window.addEventListener('mouseup', () => isDragging = false);
+
+    mount.addEventListener('touchstart', e => {
+        isDragging = true;
+        prevX = e.touches[0].clientX;
+        prevY = e.touches[0].clientY;
+    }, { passive: false });
+    mount.addEventListener('touchmove', e => {
+        onMove(e.touches[0].clientX, e.touches[0].clientY);
+        e.preventDefault();
+    }, { passive: false });
+    mount.addEventListener('touchend', () => isDragging = false);
+
+    // Initial positioning
+    updateCamera();
+
+    function animate() {
+        if (elements.resultsScreen.classList.contains('active')) {
+            requestAnimationFrame(animate);
+            renderer.render(scene, camera);
+        }
+    }
+    animate();
 }
 
 // Start the app
