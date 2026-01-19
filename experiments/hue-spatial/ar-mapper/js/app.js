@@ -48,6 +48,12 @@ const elements = {
     setFloorBtn: document.getElementById('set-floor-manual-btn'),
     skipFloorBtn: document.getElementById('skip-floor-btn'),
 
+    // Ceiling setup
+    ceilingSetupPanel: document.getElementById('ceiling-setup-panel'),
+    setCeilingBtn: document.getElementById('set-ceiling-btn'),
+    skipCeilingBtn: document.getElementById('skip-ceiling-btn'),
+    measuredCeilingHeight: document.getElementById('measured-ceiling-height'),
+
     // Corner mapping
     undoCornerBtn: document.getElementById('undo-corner-btn'),
     doneCornersBtn: document.getElementById('done-corners-btn'),
@@ -107,6 +113,18 @@ function setupEventListeners() {
     elements.setFloorBtn.addEventListener('click', () => setFloor());
     elements.skipFloorBtn.addEventListener('click', () => setFloor(0)); // Assume origin is floor
 
+    // Ceiling setup buttons
+    elements.setCeilingBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        confirmCeiling();
+    });
+    elements.skipCeilingBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        state.ceilingHeight = 2.44; // Default
+        setMode('corner-mapping');
+        showToast('Using default ceiling height (2.44m)');
+    });
+
     // Corner mapping buttons
     elements.undoCornerBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -145,6 +163,8 @@ function setupEventListeners() {
 
         if (state.mode === 'floor-setup' && state.isTargeting) {
             setFloor();
+        } else if (state.mode === 'ceiling-setup' && state.isTargeting) {
+            measureCeiling();
         } else if (state.mode === 'corner-mapping' && state.isTargeting) {
             placeCorner();
         } else if (state.mode === 'pinning' && state.isTargeting) {
@@ -288,6 +308,7 @@ function setupThreeJS() {
 function setMode(mode) {
     state.mode = mode;
     elements.floorSetupPanel.classList.toggle('active', mode === 'floor-setup');
+    elements.ceilingSetupPanel.classList.toggle('active', mode === 'ceiling-setup');
     elements.cornerMappingPanel.classList.toggle('active', mode === 'corner-mapping');
     elements.pinningPanel.classList.toggle('active', mode === 'pinning');
 }
@@ -311,9 +332,37 @@ function setFloor(overrideY = null) {
     elements.debugFloor.textContent = state.floorHeight.toFixed(3) + 'm (raw)';
     elements.debugCeiling.textContent = (state.floorHeight + state.ceilingHeight).toFixed(2) + 'm';
 
-    setMode('corner-mapping'); // Go to corner mapping first
+    setMode('ceiling-setup'); // Go to ceiling setup first
     visualizeFloor(state.floorHeight);
-    showToast(`Floor set at ${y.toFixed(2)}m. Now outline your room!`);
+    showToast(`Floor set at ${y.toFixed(2)}m. Now set the ceiling!`);
+}
+
+// Ceiling measurement
+let measuredCeilingY = null;
+
+function measureCeiling() {
+    if (!state.reticle.visible) return;
+
+    const position = new THREE.Vector3();
+    position.setFromMatrixPosition(state.reticle.matrix);
+
+    measuredCeilingY = position.y;
+    const height = measuredCeilingY - state.floorHeight;
+
+    elements.measuredCeilingHeight.textContent = height.toFixed(2);
+    elements.setCeilingBtn.disabled = false;
+
+    showToast(`Ceiling measured at ${height.toFixed(2)}m`);
+}
+
+function confirmCeiling() {
+    if (measuredCeilingY === null) return;
+
+    state.ceilingHeight = measuredCeilingY - state.floorHeight;
+    elements.debugCeiling.textContent = state.ceilingHeight.toFixed(2) + 'm';
+
+    setMode('corner-mapping');
+    showToast(`Ceiling confirmed at ${state.ceilingHeight.toFixed(2)}m. Now outline your room!`);
 }
 
 async function placePin() {
@@ -367,7 +416,14 @@ function placeCorner() {
     const position = new THREE.Vector3();
     position.setFromMatrixPosition(state.reticle.matrix);
 
-    // Place corner at floor height
+    // Constrain to floor plane - reject if hit is too far above floor
+    const heightAboveFloor = position.y - state.floorHeight;
+    if (heightAboveFloor > 0.5) {
+        showToast('Point at the floor to place corners', 'error');
+        return;
+    }
+
+    // Place corner at floor height (snap to floor)
     const cornerPos = {
         x: position.x,
         y: state.floorHeight,
@@ -441,10 +497,87 @@ function finishCorners() {
         const lineMat = new THREE.LineBasicMaterial({ color: 0x10b981 });
         const closingLine = new THREE.Line(lineGeom, lineMat);
         state.scene.add(closingLine);
+
+        // Create walls
+        createWalls();
+
+        // Replace floor grid with room polygon
+        createRoomFloor();
     }
 
     setMode('pinning');
     showToast('Room outline complete! Now pin your lights.');
+}
+
+function createWalls() {
+    if (state.corners.length < 3) return;
+
+    // Store wall meshes for later cleanup
+    state.wallMeshes = state.wallMeshes || [];
+
+    for (let i = 0; i < state.corners.length; i++) {
+        const c1 = state.corners[i].position;
+        const c2 = state.corners[(i + 1) % state.corners.length].position;
+
+        // Calculate wall dimensions
+        const dx = c2.x - c1.x;
+        const dz = c2.z - c1.z;
+        const wallLength = Math.sqrt(dx * dx + dz * dz);
+        const wallHeight = state.ceilingHeight;
+
+        // Create wall geometry
+        const wallGeom = new THREE.PlaneGeometry(wallLength, wallHeight);
+        const wallMat = new THREE.MeshBasicMaterial({
+            color: 0x6366f1,
+            transparent: true,
+            opacity: 0.15,
+            side: THREE.DoubleSide,
+            depthWrite: false
+        });
+        const wall = new THREE.Mesh(wallGeom, wallMat);
+
+        // Position and rotate wall
+        const midX = (c1.x + c2.x) / 2;
+        const midZ = (c1.z + c2.z) / 2;
+        const midY = state.floorHeight + wallHeight / 2;
+
+        wall.position.set(midX, midY, midZ);
+        wall.rotation.y = -Math.atan2(dz, dx);
+
+        state.scene.add(wall);
+        state.wallMeshes.push(wall);
+    }
+}
+
+function createRoomFloor() {
+    // Remove old floor grid/plane
+    if (state.floorGrid) state.scene.remove(state.floorGrid);
+    if (state.floorPlane) state.scene.remove(state.floorPlane);
+
+    if (state.corners.length < 3) return;
+
+    // Create shape from corners
+    const shape = new THREE.Shape();
+    shape.moveTo(state.corners[0].position.x, state.corners[0].position.z);
+    for (let i = 1; i < state.corners.length; i++) {
+        shape.lineTo(state.corners[i].position.x, state.corners[i].position.z);
+    }
+    shape.closePath();
+
+    const geometry = new THREE.ShapeGeometry(shape);
+    const material = new THREE.MeshBasicMaterial({
+        color: 0x10b981,
+        transparent: true,
+        opacity: 0.1,
+        side: THREE.DoubleSide
+    });
+
+    const floor = new THREE.Mesh(geometry, material);
+    floor.rotation.x = -Math.PI / 2;
+    floor.position.y = state.floorHeight + 0.005;
+
+    state.scene.add(floor);
+    state.floorPlane = floor;
 }
 
 function updateCornerCount() {
@@ -740,18 +873,7 @@ function setupVisualizer() {
     const grid = new THREE.GridHelper(10, 10, 0x475569, 0x334155);
     pivot.add(grid);
 
-    // Ceiling Plane (Transparent)
-    const ceilGeom = new THREE.PlaneGeometry(10, 10);
-    const ceilMat = new THREE.MeshBasicMaterial({
-        color: 0x6366f1,
-        transparent: true,
-        opacity: 0.1,
-        side: THREE.DoubleSide
-    });
-    const ceil = new THREE.Mesh(ceilGeom, ceilMat);
-    ceil.rotation.x = Math.PI / 2;
-    ceil.position.y = state.ceilingHeight;
-    pivot.add(ceil);
+    // No ceiling plane in visualizer (user request)
 
     // Center point of pins to center the view
     let centerX = 0, centerZ = 0;
@@ -764,12 +886,12 @@ function setupVisualizer() {
     }
     pivot.position.set(-centerX, 0, -centerZ);
 
-    // Room Polygon from corners
+    // Room Polygon and Walls from corners
     if (state.corners.length >= 3) {
+        // Floor polygon outline
         const cornerPoints = state.corners.map(c =>
             new THREE.Vector3(c.position.x, 0.02, c.position.z)
         );
-        // Close the polygon
         cornerPoints.push(cornerPoints[0].clone());
 
         const polygonGeom = new THREE.BufferGeometry().setFromPoints(cornerPoints);
@@ -777,7 +899,57 @@ function setupVisualizer() {
         const polygonLine = new THREE.Line(polygonGeom, polygonMat);
         pivot.add(polygonLine);
 
-        // Also add corner markers
+        // Floor fill
+        const floorShape = new THREE.Shape();
+        floorShape.moveTo(state.corners[0].position.x, state.corners[0].position.z);
+        for (let i = 1; i < state.corners.length; i++) {
+            floorShape.lineTo(state.corners[i].position.x, state.corners[i].position.z);
+        }
+        floorShape.closePath();
+
+        const floorFillGeom = new THREE.ShapeGeometry(floorShape);
+        const floorFillMat = new THREE.MeshBasicMaterial({
+            color: 0x10b981,
+            transparent: true,
+            opacity: 0.15,
+            side: THREE.DoubleSide
+        });
+        const floorFill = new THREE.Mesh(floorFillGeom, floorFillMat);
+        floorFill.rotation.x = -Math.PI / 2;
+        floorFill.position.y = 0.01;
+        pivot.add(floorFill);
+
+        // Walls with back-face transparency
+        for (let i = 0; i < state.corners.length; i++) {
+            const c1 = state.corners[i].position;
+            const c2 = state.corners[(i + 1) % state.corners.length].position;
+
+            const dx = c2.x - c1.x;
+            const dz = c2.z - c1.z;
+            const wallLength = Math.sqrt(dx * dx + dz * dz);
+            const wallHeight = state.ceilingHeight;
+
+            const wallGeom = new THREE.PlaneGeometry(wallLength, wallHeight);
+            const wallMat = new THREE.MeshBasicMaterial({
+                color: 0x6366f1,
+                transparent: true,
+                opacity: 0.25,
+                side: THREE.FrontSide, // Only front side visible (back faces transparent)
+                depthWrite: false
+            });
+            const wall = new THREE.Mesh(wallGeom, wallMat);
+
+            const midX = (c1.x + c2.x) / 2;
+            const midZ = (c1.z + c2.z) / 2;
+            const midY = wallHeight / 2;
+
+            wall.position.set(midX, midY, midZ);
+            wall.rotation.y = -Math.atan2(dz, dx);
+
+            pivot.add(wall);
+        }
+
+        // Corner markers
         state.corners.forEach((c, i) => {
             const markerGeom = new THREE.CylinderGeometry(0.03, 0.03, 0.1, 8);
             const markerMat = new THREE.MeshStandardMaterial({
