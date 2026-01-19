@@ -1,0 +1,298 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="description" content="AR Light Mapper - Map your smart lights in 3D space using augmented reality">
+    <title>AR Light Mapper</title>
+
+    <!-- Three.js -->
+    <script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
+
+    <!-- Google Fonts -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+
+    <link rel="stylesheet" href="styles.css">
+</head>
+
+<body>
+    <!-- Pre-AR UI -->
+    <div id="intro-screen" class="screen active">
+        <div class="intro-content">
+            <div class="logo-container">
+                <div class="logo-icon">
+                    <svg viewBox="0 0 100 100" xmlns="http://www.w3.org/2000/svg">
+                        <defs>
+                            <linearGradient id="logoGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+                                <stop offset="0%" style="stop-color:#6366f1" />
+                                <stop offset="100%" style="stop-color:#8b5cf6" />
+                            </linearGradient>
+                        </defs>
+                        <circle cx="50" cy="35" r="20" fill="url(#logoGradient)" opacity="0.9" />
+                        <path d="M35 55 Q50 75 65 55" stroke="url(#logoGradient)" stroke-width="4" fill="none"
+                            stroke-linecap="round" />
+                        <circle cx="50" cy="35" r="8" fill="white" opacity="0.8" />
+                        <line x1="50" y1="55" x2="50" y2="85" stroke="url(#logoGradient)" stroke-width="3"
+                            stroke-linecap="round" />
+                    </svg>
+                </div>
+                <h1>AR Light Mapper</h1>
+            </div>
+
+            <p class="intro-description">
+                Map your smart lights in 3D space using augmented reality.
+                Walk around your room and tap to pin each light's location.
+            </p>
+
+            <div class="ceiling-input-container">
+                <label for="ceiling-height">Ceiling Height</label>
+                <div class="input-group">
+                    <input type="number" id="ceiling-height" value="2.44" step="0.01" min="1.5" max="5.0">
+                    <span class="unit">meters</span>
+                </div>
+                <small>Default: 8 feet (2.44m). Adjust if needed.</small>
+            </div>
+
+            <button id="start-ar-btn" class="primary-btn">
+                <span class="btn-icon">📱</span>
+                Start AR Session
+            </button>
+
+            <div id="ar-status" class="status-message"></div>
+
+            <div class="requirements">
+                <h3>Requirements</h3>
+                <ul>
+                    <li>Android device with ARCore support (Pixel 7+, Samsung Galaxy S21+, etc.)</li>
+                    <li>Chrome browser (latest version)</li>
+                    <li>Well-lit room for better tracking</li>
+                </ul>
+            </div>
+        </div>
+    </div>
+
+    <!-- AR Session UI Overlay -->
+    <div id="ar-overlay" class="screen">
+        <div class="ar-header">
+            <button id="exit-ar-btn" class="icon-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+            <div class="session-info">
+                <span id="pin-count">0</span> pins placed
+            </div>
+            <button id="toggle-debug-btn" class="icon-btn">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <circle cx="12" cy="12" r="3"></circle>
+                    <path
+                        d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 0 1 0 2.83 2 2 0 0 1-2.83 0l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-2 2 2 2 0 0 1-2-2v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 0 1-2.83 0 2 2 0 0 1 0-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1-2-2 2 2 0 0 1 2-2h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 0 1 0-2.83 2 2 0 0 1 2.83 0l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 2-2 2 2 0 0 1 2 2v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 0 1 2.83 0 2 2 0 0 1 0 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 2 2 2 2 0 0 1-2 2h-.09a1.65 1.65 0 0 0-1.51 1z">
+                    </path>
+                </svg>
+            </button>
+        </div>
+
+        <!-- Floor/Ceiling Setup Panel -->
+        <div id="floor-setup-panel" class="setup-panel active">
+            <div class="setup-content">
+                <div class="setup-icon">⬇️</div>
+                <h2>Find the Floor</h2>
+                <p>Point your camera at the floor to detect it automatically, or tap the floor to set it manually.</p>
+                <div class="floor-status">
+                    <span id="floor-detection-status">Searching for floor...</span>
+                </div>
+                <button id="set-floor-manual-btn" class="secondary-btn">Tap Floor to Set</button>
+                <button id="skip-floor-btn" class="text-btn">Use Current Position as Floor</button>
+            </div>
+        </div>
+
+        <!-- Light Pinning Mode -->
+        <div id="pinning-panel" class="pinning-panel">
+            <div class="pinning-instructions">
+                <div class="instruction-icon">💡</div>
+                <p>Tap on a light to pin its location</p>
+            </div>
+            <div class="pinning-actions">
+                <button id="undo-pin-btn" class="action-btn" disabled>
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <path d="M3 7v6h6"></path>
+                        <path d="M21 17a9 9 0 0 0-9-9 9 9 0 0 0-6 2.3L3 13"></path>
+                    </svg>
+                    Undo
+                </button>
+                <button id="finish-btn" class="action-btn primary">
+                    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                        <polyline points="20 6 9 17 4 12"></polyline>
+                    </svg>
+                    <span>Finish</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- Crosshair / Reticle -->
+        <div id="reticle" class="reticle">
+            <div class="reticle-ring"></div>
+            <div class="reticle-dot"></div>
+        </div>
+
+        <!-- Tap Feedback -->
+        <div id="tap-feedback" class="tap-feedback"></div>
+
+        <!-- Height Indicator -->
+        <div id="height-indicator" class="height-indicator">
+            <span class="height-value">0.00</span>m
+        </div>
+    </div>
+
+    <!-- Debug Panel -->
+    <div id="debug-panel" class="debug-panel">
+        <div class="debug-header">
+            <h3>Debug Panel</h3>
+            <button id="close-debug-btn" class="icon-btn small">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                    <line x1="18" y1="6" x2="6" y2="18"></line>
+                    <line x1="6" y1="6" x2="18" y2="18"></line>
+                </svg>
+            </button>
+        </div>
+        <div class="debug-content">
+            <div class="debug-section">
+                <h4>Session Info</h4>
+                <div class="debug-row">
+                    <span>Floor Height:</span>
+                    <span id="debug-floor-height">--</span>
+                </div>
+                <div class="debug-row">
+                    <span>Ceiling Height:</span>
+                    <span id="debug-ceiling-height">--</span>
+                </div>
+                <div class="debug-row">
+                    <span>Total Pins:</span>
+                    <span id="debug-pin-count">0</span>
+                </div>
+            </div>
+
+            <div class="debug-section">
+                <h4>Camera Position</h4>
+                <div class="debug-row">
+                    <span>X:</span>
+                    <span id="debug-cam-x">0.00</span>
+                </div>
+                <div class="debug-row">
+                    <span>Y (raw):</span>
+                    <span id="debug-cam-y">0.00</span>
+                </div>
+                <div class="debug-row">
+                    <span>Z:</span>
+                    <span id="debug-cam-z">0.00</span>
+                </div>
+                <div class="debug-row">
+                    <span>Height from floor:</span>
+                    <span id="debug-cam-height">0.00</span>
+                </div>
+            </div>
+
+            <div class="debug-section">
+                <h4>Pinned Lights</h4>
+                <div id="debug-pins-list" class="debug-pins-list">
+                    <p class="no-pins">No pins yet</p>
+                </div>
+            </div>
+
+            <div class="debug-section">
+                <h4>Actions</h4>
+                <div class="debug-actions">
+                    <button id="debug-show-all-pins" class="debug-btn">Show All Pins</button>
+                    <button id="debug-hide-all-pins" class="debug-btn">Hide All Pins</button>
+                    <button id="debug-clear-pins" class="debug-btn danger">Clear All Pins</button>
+                    <button id="debug-export-json" class="debug-btn">Export JSON</button>
+                </div>
+            </div>
+
+            <div class="debug-section">
+                <h4>Plane Detection</h4>
+                <div id="debug-planes" class="debug-planes">
+                    <p>No planes detected</p>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Results Screen -->
+    <div id="results-screen" class="screen">
+        <div class="results-content">
+            <div class="results-header">
+                <div class="success-icon">✅</div>
+                <h1>Mapping Complete!</h1>
+                <p>You've mapped <span id="results-pin-count">0</span> lights</p>
+            </div>
+
+            <div class="results-summary">
+                <div class="summary-card">
+                    <h3>Room Bounds</h3>
+                    <div class="bounds-info">
+                        <div class="bound-row">
+                            <span>Width (X):</span>
+                            <span id="room-width">0.00</span>m
+                        </div>
+                        <div class="bound-row">
+                            <span>Depth (Z):</span>
+                            <span id="room-depth">0.00</span>m
+                        </div>
+                        <div class="bound-row">
+                            <span>Height (Floor to Ceiling):</span>
+                            <span id="room-height">0.00</span>m
+                        </div>
+                    </div>
+                </div>
+
+                <div class="summary-card">
+                    <h3>Light Positions</h3>
+                    <div id="results-lights-list" class="lights-list"></div>
+                </div>
+            </div>
+
+            <div class="results-json">
+                <h3>JSON Output</h3>
+                <div class="json-container">
+                    <pre id="json-output"></pre>
+                </div>
+                <div class="json-actions">
+                    <button id="copy-json-btn" class="secondary-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"
+                            height="18">
+                            <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect>
+                            <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path>
+                        </svg>
+                        Copy JSON
+                    </button>
+                    <button id="download-json-btn" class="secondary-btn">
+                        <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" width="18"
+                            height="18">
+                            <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                            <polyline points="7 10 12 15 17 10"></polyline>
+                            <line x1="12" y1="15" x2="12" y2="3"></line>
+                        </svg>
+                        Download
+                    </button>
+                </div>
+            </div>
+
+            <div class="results-actions">
+                <button id="new-session-btn" class="primary-btn">Start New Session</button>
+            </div>
+        </div>
+    </div>
+
+    <!-- Toast Notifications -->
+    <div id="toast-container" class="toast-container"></div>
+
+    <!-- Scripts -->
+    <script type="module" src="js/app.js"></script>
+</body>
+
+</html>

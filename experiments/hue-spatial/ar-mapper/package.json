@@ -1,0 +1,13 @@
+{
+  "name": "ar-light-mapper",
+  "version": "1.0.0",
+  "description": "AR tool for mapping smart lights in 3D space",
+  "main": "index.html",
+  "scripts": {
+    "start": "npx serve -s ."
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "serve": "^14.2.1"
+  }
+}
