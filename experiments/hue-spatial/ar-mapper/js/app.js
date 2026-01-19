@@ -332,9 +332,9 @@ function setFloor(overrideY = null) {
     elements.debugFloor.textContent = state.floorHeight.toFixed(3) + 'm (raw)';
     elements.debugCeiling.textContent = (state.floorHeight + state.ceilingHeight).toFixed(2) + 'm';
 
-    setMode('ceiling-setup'); // Go to ceiling setup first
+    setMode('corner-mapping'); // Go to room outline first (before ceiling)
     visualizeFloor(state.floorHeight);
-    showToast(`Floor set at ${y.toFixed(2)}m. Now set the ceiling!`);
+    showToast(`Floor set at ${y.toFixed(2)}m. Now outline your room!`);
 }
 
 // Ceiling measurement
@@ -361,8 +361,15 @@ function confirmCeiling() {
     state.ceilingHeight = measuredCeilingY - state.floorHeight;
     elements.debugCeiling.textContent = state.ceilingHeight.toFixed(2) + 'm';
 
-    setMode('corner-mapping');
-    showToast(`Ceiling confirmed at ${state.ceilingHeight.toFixed(2)}m. Now outline your room!`);
+    // Re-create walls with correct height now that we know ceiling
+    if (state.wallMeshes) {
+        state.wallMeshes.forEach(w => state.scene.remove(w));
+        state.wallMeshes = [];
+    }
+    createWalls();
+
+    setMode('pinning');
+    showToast(`Ceiling confirmed at ${state.ceilingHeight.toFixed(2)}m. Now pin your lights!`);
 }
 
 async function placePin() {
@@ -505,8 +512,8 @@ function finishCorners() {
         createRoomFloor();
     }
 
-    setMode('pinning');
-    showToast('Room outline complete! Now pin your lights.');
+    setMode('ceiling-setup'); // Now measure ceiling height
+    showToast('Room outline complete! Now set the ceiling height.');
 }
 
 function createWalls() {
@@ -886,6 +893,36 @@ function setupVisualizer() {
     }
     pivot.position.set(-centerX, 0, -centerZ);
 
+    // Grid alignment: find best rotation to align with room edges
+    if (state.corners.length >= 3) {
+        // Calculate all edge angles
+        const edgeAngles = [];
+        for (let i = 0; i < state.corners.length; i++) {
+            const c1 = state.corners[i].position;
+            const c2 = state.corners[(i + 1) % state.corners.length].position;
+            const dx = c2.x - c1.x;
+            const dz = c2.z - c1.z;
+            const angle = Math.atan2(dz, dx);
+            const length = Math.sqrt(dx * dx + dz * dz);
+            edgeAngles.push({ angle, length });
+        }
+
+        // Normalize angles to 0-90 degree range (edges can be any of 4 perpendicular orientations)
+        const normalizedAngles = edgeAngles.map(e => {
+            let a = e.angle;
+            while (a < 0) a += Math.PI;
+            while (a >= Math.PI / 2) a -= Math.PI / 2;
+            return { angle: a, length: e.length };
+        });
+
+        // Find weighted average by edge length (prefer longer edges)
+        const totalLength = normalizedAngles.reduce((sum, e) => sum + e.length, 0);
+        const weightedAngle = normalizedAngles.reduce((sum, e) => sum + e.angle * e.length, 0) / totalLength;
+
+        // Apply rotation to grid
+        grid.rotation.y = weightedAngle;
+    }
+
     // Room Polygon and Walls from corners
     if (state.corners.length >= 3) {
         // Floor polygon outline
@@ -934,7 +971,7 @@ function setupVisualizer() {
                 color: 0x6366f1,
                 transparent: true,
                 opacity: 0.25,
-                side: THREE.FrontSide, // Only front side visible (back faces transparent)
+                side: THREE.BackSide, // Back side visible (so front/near walls are transparent)
                 depthWrite: false
             });
             const wall = new THREE.Mesh(wallGeom, wallMat);
@@ -963,7 +1000,35 @@ function setupVisualizer() {
         });
     }
 
-    // Add Pins
+    // Add Axes Helper
+    const axesHelper = new THREE.AxesHelper(1);
+    axesHelper.position.set(0, 0.01, 0);
+    pivot.add(axesHelper);
+
+    // Axes labels
+    const axisLabels = [
+        { text: 'X', pos: [1.1, 0.01, 0], color: '#ff0000' },
+        { text: 'Y', pos: [0, 0.01, 1.1], color: '#00ff00' }
+    ];
+    axisLabels.forEach(({ text, pos, color }) => {
+        const canvas = document.createElement('canvas');
+        canvas.width = 64;
+        canvas.height = 64;
+        const ctx = canvas.getContext('2d');
+        ctx.fillStyle = color;
+        ctx.font = 'bold 48px Arial';
+        ctx.textAlign = 'center';
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, 32, 32);
+        const texture = new THREE.CanvasTexture(canvas);
+        const spriteMat = new THREE.SpriteMaterial({ map: texture, depthTest: false });
+        const sprite = new THREE.Sprite(spriteMat);
+        sprite.position.set(pos[0], pos[1], pos[2]);
+        sprite.scale.set(0.15, 0.15, 1);
+        pivot.add(sprite);
+    });
+
+    // Add Pins with coordinate labels
     state.pins.forEach(p => {
         // Pin Sphere
         const pinGeom = new THREE.SphereGeometry(0.04, 16, 16);
@@ -986,6 +1051,27 @@ function setupVisualizer() {
         const lineMat = new THREE.LineBasicMaterial({ color: 0x475569, transparent: true, opacity: 0.5 });
         const line = new THREE.Line(lineGeom, lineMat);
         pivot.add(line);
+
+        // Coordinate label (tiny text)
+        const labelCanvas = document.createElement('canvas');
+        labelCanvas.width = 256;
+        labelCanvas.height = 64;
+        const labelCtx = labelCanvas.getContext('2d');
+        labelCtx.fillStyle = 'rgba(0,0,0,0.6)';
+        labelCtx.fillRect(0, 0, 256, 64);
+        labelCtx.fillStyle = 'white';
+        labelCtx.font = '24px monospace';
+        labelCtx.textAlign = 'center';
+        labelCtx.textBaseline = 'middle';
+        const coordText = `${p.relativePos.x.toFixed(2)}, ${p.relativePos.y.toFixed(2)}, ${p.relativePos.z.toFixed(2)}`;
+        labelCtx.fillText(coordText, 128, 32);
+
+        const labelTexture = new THREE.CanvasTexture(labelCanvas);
+        const labelMat = new THREE.SpriteMaterial({ map: labelTexture, depthTest: false });
+        const labelSprite = new THREE.Sprite(labelMat);
+        labelSprite.position.set(p.relativePos.x, p.relativePos.z + 0.1, p.relativePos.y);
+        labelSprite.scale.set(0.3, 0.075, 1);
+        pivot.add(labelSprite);
     });
 
     // Interaction logic
