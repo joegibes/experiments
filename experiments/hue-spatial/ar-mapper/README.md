@@ -12,61 +12,68 @@ A WebXR-based tool for mapping smart lights in 3D space using augmented reality.
 ### Running the Server
 
 ```bash
-# Navigate to the ar-mapper folder
 cd ar-mapper
-
-# Install dependencies (first time only)
-npm install
-
-# Start the local server
-npm start
+npm install    # First time only
+npm start      # Start local server at http://localhost:3000
 ```
 
-### Accessing from Mobile
+### Accessing from Mobile (HTTPS Required)
 
-WebXR requires HTTPS. Use one of these tunneling methods:
-
-**Option 1: Serveo (Recommended - No install needed)**
+**Serveo (Recommended - No install)**
 ```bash
 ssh -R 80:localhost:3000 serveo.net
 ```
 
-**Option 2: Localtunnel**
-```bash
-npx localtunnel --port 3000
-```
+**Alternatives:** `npx localtunnel --port 3000` or `ngrok http 3000`
 
-**Option 3: ngrok**
-```bash
-ngrok http 3000
-```
+Open the generated URL on your Android phone in Chrome.
 
-Open the generated HTTPS URL on your Android phone in Chrome.
+---
 
-## How It Works
+## User Guide
 
 ### Workflow
 
-1. **Floor Detection**
-   - Point your camera at the floor
-   - The app auto-detects it after ~1 second of stable tracking
-   - Or tap the floor manually to set it
+1. **Floor Detection** - Point at floor, auto-detects after ~1 second (or tap manually)
+2. **Room Outline** - Tap each corner of your room (optional but recommended)
+3. **Ceiling Height** - Tap the ceiling/wall top to measure (or skip for 2.44m default)
+4. **Light Pinning** - Point at lights and tap to place 3D pins
+5. **Results** - View 3D visualization and export JSON
 
-2. **Room Outline (Optional)**
-   - Walk around and tap each corner of your room
-   - This creates a polygon representing your room's shape
-   - You can skip this step if you just want to map lights
+### Controls
 
-3. **Light Pinning**
-   - Point at each light fixture and tap to place a pin
-   - The app records the 3D coordinates relative to the floor
-   - Height is calculated automatically
+| Action | Description |
+|--------|-------------|
+| Tap floor | Set floor level |
+| Tap corners | Define room shape |
+| Tap lights | Place coordinate pin |
+| ← Back | Go to previous step |
+| Finish | End mapping, show results |
 
-4. **Results**
-   - View a 3D visualization of your mapped room
-   - Export coordinates as JSON for Home Assistant
+### 3D Visualizer Controls
 
-### Coordinate System
+| Platform | Action |
+|----------|--------|
+| Mobile | Drag to rotate, pinch to zoom |
+| Desktop | Click+drag to rotate, scroll to zoom |
+
+---
+
+## Features
+
+- **Auto Floor Detection** - Detects horizontal surfaces with visual feedback
+- **Plane Detection VFX** - Radiating particles + haptic when surface found
+- **Room Corner Mapping** - Define perimeter, visualize walls in AR
+- **Ceiling Height Measurement** - Tap ceiling or use default
+- **3D Hit Testing** - Detects planes and feature points
+- **Real-time Height Display** - Shows height as you aim
+- **3D Room Visualizer** - Interactive preview with walls
+- **Haptic Feedback** - Vibration on actions
+- **JSON Export** - Ready for Home Assistant
+
+---
+
+## Coordinate System
 
 | Axis | Description |
 |------|-------------|
@@ -74,47 +81,59 @@ Open the generated HTTPS URL on your Android phone in Chrome.
 | Y | Depth/Forward (meters) |
 | Z | Height from floor (meters) |
 
-> **Note:** WebXR uses Y-up internally, but the exported JSON maps to Z-up for consistency with physical intuition.
+> **Note:** WebXR uses Y-up internally, but exports map to Z-up.
 
-## Features
+---
 
-- **Auto Floor Detection** - Automatically detects horizontal surfaces
-- **Room Corner Mapping** - Define your room's perimeter for accurate visualization
-- **3D Hit Testing** - Detects both planes and feature points for accurate placement
-- **Real-time Height Display** - Shows current height from floor as you aim
-- **3D Room Visualizer** - Interactive preview of your mapped space
-- **JSON Export** - Ready for the Home Assistant "Director" Add-on
+## Debugging
+
+```javascript
+// In browser console:
+window.debugExport()  // Copies all state data to clipboard
+```
+
+Returns: `{timestamp, floorHeight, ceilingHeight, corners[], pins[]}`
+
+---
 
 ## Key Learnings
 
 ### WebXR on Android
-- Must use HTTPS (or localhost) for camera access
-- `domOverlay` feature allows HTML UI over the camera feed
-- Hit testing with `entityTypes: ['plane', 'point']` enables detection of non-planar objects
+- Requires HTTPS (use tunneling)
+- `domOverlay` allows HTML UI over camera
+- Hit testing with `['plane', 'point']` enables object detection
 
-### Three.js Integration
-- Renderer canvas must be appended to `document.body`, not the DOM overlay
-- Set `scene.background = null` for AR transparency
-- Use `renderer.xr.setSession(session)` to connect Three.js to WebXR
+### Three.js + WebXR
+- Canvas goes on `document.body`, not DOM overlay
+- `scene.background = null` for AR transparency
+- `renderer.xr.setSession(session)` connects to WebXR
+
+### Floor Polygon Alignment
+- ShapeGeometry uses 2D (x,y) coords
+- When rotated -π/2 around X: shape Y becomes -world Z
+- Fix: Negate Z when building shape (`-position.z`)
 
 ### Common Issues
-- **Black screen**: Canvas not properly layered or background not transparent
-- **Hit test fails on objects**: Need to include `'point'` in entityTypes
-- **Auto-floor not triggering**: Requires stable tracking for threshold duration
+- **Black screen**: Canvas layering or background issue
+- **Hit test fails**: Include `'point'` in entityTypes
+- **Floor polygon misaligned**: Check coordinate negation
+
+---
 
 ## Project Structure
 
 ```
 ar-mapper/
-├── index.html      # Main HTML with all UI screens
-├── styles.css      # CSS with modern dark theme
-├── js/
-│   └── app.js      # Core application logic
-├── package.json    # npm scripts and dependencies
+├── index.html      # UI screens
+├── styles.css      # Dark theme
+├── js/app.js       # Core logic
+├── package.json    # npm config
 └── README.md       # This file
 ```
 
-## API Output Format
+---
+
+## JSON Output
 
 ```json
 {
@@ -125,11 +144,12 @@ ar-mapper/
     "depth": 3.2
   },
   "lights": {
-    "light.mapped_1": { "x": 1.2, "y": 2.1, "z": 2.3 },
-    "light.mapped_2": { "x": -0.5, "y": 1.8, "z": 2.1 }
+    "light.mapped_1": { "x": 1.2, "y": 2.1, "z": 2.3 }
   }
 }
 ```
+
+---
 
 ## License
 

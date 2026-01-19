@@ -848,6 +848,9 @@ function showResults() {
         state.session.end();
     }
 
+    // Set mode to results to prevent any further AR actions
+    state.mode = 'results';
+
     elements.arOverlay.classList.remove('active');
     elements.resultsScreen.classList.add('active');
 
