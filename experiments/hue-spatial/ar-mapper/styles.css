@@ -234,6 +234,32 @@ input {
     border-color: var(--success);
 }
 
+/* Back buttons */
+.back-btn {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    background: rgba(255, 255, 255, 0.1);
+    border: 1px solid var(--glass-border);
+    color: white;
+    padding: 8px 16px;
+    border-radius: 20px;
+    font-size: 0.85rem;
+    cursor: pointer;
+    transition: background 0.2s;
+}
+
+.back-btn:hover {
+    background: rgba(255, 255, 255, 0.2);
+}
+
+.panel-back {
+    position: relative;
+    top: auto;
+    left: auto;
+    margin-bottom: 15px;
+}
+
 .pinning-actions {
     position: absolute;
     top: 20px;

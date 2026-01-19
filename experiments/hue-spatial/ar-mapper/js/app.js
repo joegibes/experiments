@@ -53,12 +53,17 @@ const elements = {
     setCeilingBtn: document.getElementById('set-ceiling-btn'),
     skipCeilingBtn: document.getElementById('skip-ceiling-btn'),
     measuredCeilingHeight: document.getElementById('measured-ceiling-height'),
+    ceilingBackBtn: document.getElementById('ceiling-back-btn'),
 
     // Corner mapping
     undoCornerBtn: document.getElementById('undo-corner-btn'),
     doneCornersBtn: document.getElementById('done-corners-btn'),
     skipCornersBtn: document.getElementById('skip-corners-btn'),
     cornerCount: document.getElementById('corner-count'),
+    cornerBackBtn: document.getElementById('corner-back-btn'),
+
+    // Pinning
+    pinningBackBtn: document.getElementById('pinning-back-btn'),
 
     undoPinBtn: document.getElementById('undo-pin-btn'),
     finishBtn: document.getElementById('finish-btn'),
@@ -113,6 +118,34 @@ function setupEventListeners() {
     elements.setFloorBtn.addEventListener('click', () => setFloor());
     elements.skipFloorBtn.addEventListener('click', () => setFloor(0)); // Assume origin is floor
 
+    // Back buttons
+    elements.cornerBackBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        // Clear corners and go back to floor setup
+        state.corners.forEach(c => {
+            state.scene.remove(c.mesh);
+            if (c.mesh.userData.line) state.scene.remove(c.mesh.userData.line);
+        });
+        state.corners = [];
+        updateCornerCount();
+        setMode('floor-setup');
+        showToast('Back to floor setup');
+    });
+
+    elements.ceilingBackBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        // Go back to corner mapping
+        setMode('corner-mapping');
+        showToast('Back to room outline');
+    });
+
+    elements.pinningBackBtn.addEventListener('click', (e) => {
+        e.stopPropagation();
+        // Go back to ceiling
+        setMode('ceiling-setup');
+        showToast('Back to ceiling setup');
+    });
+
     // Ceiling setup buttons
     elements.setCeilingBtn.addEventListener('click', (e) => {
         e.stopPropagation();
@@ -121,7 +154,7 @@ function setupEventListeners() {
     elements.skipCeilingBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         state.ceilingHeight = 2.44; // Default
-        setMode('corner-mapping');
+        setMode('pinning');
         showToast('Using default ceiling height (2.44m)');
     });
 
@@ -187,6 +220,28 @@ function showToast(msg, type = 'info') {
     toast.textContent = msg;
     elements.toastContainer.appendChild(toast);
     setTimeout(() => toast.remove(), 3000);
+}
+
+// Haptic feedback
+function haptic(pattern = 'short') {
+    if (!navigator.vibrate) return;
+
+    switch (pattern) {
+        case 'short':
+            navigator.vibrate(50);
+            break;
+        case 'medium':
+            navigator.vibrate(100);
+            break;
+        case 'double':
+            navigator.vibrate([50, 50, 50]);
+            break;
+        case 'success':
+            navigator.vibrate([50, 100, 100]);
+            break;
+        default:
+            navigator.vibrate(50);
+    }
 }
 
 // Debug: Capture console output to screen
@@ -414,6 +469,7 @@ async function placePin() {
     // elements.finishBtn.disabled = false; // Always enabled now
 
     showToast(`Pinned #${pinId} @ ${heightFromFloor.toFixed(2)}m`);
+    haptic('success');
 }
 
 // Corner Mapping Functions
@@ -471,6 +527,7 @@ function placeCorner() {
     elements.undoCornerBtn.disabled = false;
 
     showToast(`Corner ${state.corners.length} placed`);
+    haptic('short');
 }
 
 function undoCorner() {
@@ -1052,25 +1109,25 @@ function setupVisualizer() {
         const line = new THREE.Line(lineGeom, lineMat);
         pivot.add(line);
 
-        // Coordinate label (tiny text)
+        // Coordinate label (larger text)
         const labelCanvas = document.createElement('canvas');
-        labelCanvas.width = 256;
-        labelCanvas.height = 64;
+        labelCanvas.width = 512;
+        labelCanvas.height = 128;
         const labelCtx = labelCanvas.getContext('2d');
-        labelCtx.fillStyle = 'rgba(0,0,0,0.6)';
-        labelCtx.fillRect(0, 0, 256, 64);
+        labelCtx.fillStyle = 'rgba(0,0,0,0.7)';
+        labelCtx.fillRect(0, 0, 512, 128);
         labelCtx.fillStyle = 'white';
-        labelCtx.font = '24px monospace';
+        labelCtx.font = 'bold 48px monospace';
         labelCtx.textAlign = 'center';
         labelCtx.textBaseline = 'middle';
         const coordText = `${p.relativePos.x.toFixed(2)}, ${p.relativePos.y.toFixed(2)}, ${p.relativePos.z.toFixed(2)}`;
-        labelCtx.fillText(coordText, 128, 32);
+        labelCtx.fillText(coordText, 256, 64);
 
         const labelTexture = new THREE.CanvasTexture(labelCanvas);
         const labelMat = new THREE.SpriteMaterial({ map: labelTexture, depthTest: false });
         const labelSprite = new THREE.Sprite(labelMat);
-        labelSprite.position.set(p.relativePos.x, p.relativePos.z + 0.1, p.relativePos.y);
-        labelSprite.scale.set(0.3, 0.075, 1);
+        labelSprite.position.set(p.relativePos.x, p.relativePos.z + 0.15, p.relativePos.y);
+        labelSprite.scale.set(0.5, 0.125, 1);
         pivot.add(labelSprite);
     });
 
