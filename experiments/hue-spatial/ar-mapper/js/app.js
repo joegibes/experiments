@@ -244,6 +244,58 @@ function haptic(pattern = 'short') {
     }
 }
 
+// Plane detection VFX: radiating particles
+function createPlaneDetectedVFX(position) {
+    const numParticles = 12;
+    const particles = [];
+
+    for (let i = 0; i < numParticles; i++) {
+        const angle = (i / numParticles) * Math.PI * 2;
+        const geom = new THREE.SphereGeometry(0.008, 8, 8);
+        const mat = new THREE.MeshBasicMaterial({
+            color: 0x10b981,
+            transparent: true,
+            opacity: 1
+        });
+        const particle = new THREE.Mesh(geom, mat);
+        particle.position.set(position.x, position.y, position.z);
+        particle.userData.angle = angle;
+        particle.userData.startTime = performance.now();
+        state.scene.add(particle);
+        particles.push(particle);
+    }
+
+    // Animate particles
+    function animateParticles() {
+        const now = performance.now();
+        let allDone = true;
+
+        particles.forEach((p, i) => {
+            const elapsed = now - p.userData.startTime;
+            const duration = 600;
+            const progress = Math.min(1, elapsed / duration);
+
+            if (progress < 1) {
+                allDone = false;
+                const radius = progress * 0.3;
+                const angle = p.userData.angle;
+                p.position.x = position.x + Math.cos(angle) * radius;
+                p.position.z = position.z + Math.sin(angle) * radius;
+                p.material.opacity = 1 - progress;
+                p.scale.setScalar(1 + progress * 2);
+            } else {
+                state.scene.remove(p);
+            }
+        });
+
+        if (!allDone) {
+            requestAnimationFrame(animateParticles);
+        }
+    }
+
+    animateParticles();
+}
+
 // Debug: Capture console output to screen
 const debugConsole = document.createElement('div');
 debugConsole.style.cssText = 'position:fixed;top:0;left:0;right:0;height:100px;overflow:auto;background:rgba(0,0,0,0.8);color:#fff;font-size:10px;z-index:9999;pointer-events:none;padding:5px;';
@@ -620,11 +672,11 @@ function createRoomFloor() {
 
     if (state.corners.length < 3) return;
 
-    // Create shape from corners
+    // Create shape from corners (negate Z for correct rotation alignment)
     const shape = new THREE.Shape();
-    shape.moveTo(state.corners[0].position.x, state.corners[0].position.z);
+    shape.moveTo(state.corners[0].position.x, -state.corners[0].position.z);
     for (let i = 1; i < state.corners.length; i++) {
-        shape.lineTo(state.corners[i].position.x, state.corners[i].position.z);
+        shape.lineTo(state.corners[i].position.x, -state.corners[i].position.z);
     }
     shape.closePath();
 
@@ -693,10 +745,17 @@ function render(timestamp, frame) {
         const hit = hitTestResults[0];
         const pose = hit.getPose(state.localReferenceSpace);
 
+        const wasVisible = state.reticle.visible;
         state.reticle.visible = true;
         state.reticle.matrix.fromArray(pose.transform.matrix);
         state.isTargeting = true;
         document.getElementById('reticle').classList.add('targeting');
+
+        // Plane detection VFX: trigger when first detected
+        if (!wasVisible) {
+            haptic('double');
+            createPlaneDetectedVFX(pose.transform.position);
+        }
 
         // Update height indicator
         const currentY = pose.transform.position.y;
@@ -862,6 +921,39 @@ function downloadJSON() {
     URL.revokeObjectURL(url);
 }
 
+// Debug export: capture all state data for diagnosis
+function debugExport() {
+    const debugData = {
+        timestamp: new Date().toISOString(),
+        floorHeight: state.floorHeight,
+        ceilingHeight: state.ceilingHeight,
+        corners: state.corners.map(c => ({
+            x: c.position.x,
+            y: c.position.y,
+            z: c.position.z
+        })),
+        pins: state.pins.map(p => ({
+            id: p.id,
+            relativePos: p.relativePos
+        }))
+    };
+
+    const jsonStr = JSON.stringify(debugData, null, 2);
+    navigator.clipboard.writeText(jsonStr).then(() => {
+        showToast('Debug data copied to clipboard!');
+    }).catch(err => {
+        console.error('Clipboard error:', err);
+        // Fallback: log to console
+        console.log('DEBUG DATA:', jsonStr);
+        showToast('Debug data logged to console');
+    });
+
+    return debugData;
+}
+
+// Expose debug function globally
+window.debugExport = debugExport;
+
 function addPinToDebugList(pin) {
     const item = document.createElement('div');
     item.className = 'debug-pin-item';
@@ -993,11 +1085,11 @@ function setupVisualizer() {
         const polygonLine = new THREE.Line(polygonGeom, polygonMat);
         pivot.add(polygonLine);
 
-        // Floor fill
+        // Floor fill (negate Z for correct rotation alignment)
         const floorShape = new THREE.Shape();
-        floorShape.moveTo(state.corners[0].position.x, state.corners[0].position.z);
+        floorShape.moveTo(state.corners[0].position.x, -state.corners[0].position.z);
         for (let i = 1; i < state.corners.length; i++) {
-            floorShape.lineTo(state.corners[i].position.x, state.corners[i].position.z);
+            floorShape.lineTo(state.corners[i].position.x, -state.corners[i].position.z);
         }
         floorShape.closePath();
 
@@ -1027,9 +1119,10 @@ function setupVisualizer() {
             const wallMat = new THREE.MeshBasicMaterial({
                 color: 0x6366f1,
                 transparent: true,
-                opacity: 0.25,
-                side: THREE.BackSide, // Back side visible (so front/near walls are transparent)
-                depthWrite: false
+                opacity: 0.12,
+                side: THREE.DoubleSide,
+                depthWrite: false,
+                blending: THREE.NormalBlending
             });
             const wall = new THREE.Mesh(wallGeom, wallMat);
 
@@ -1165,15 +1258,44 @@ function setupVisualizer() {
     window.addEventListener('mouseup', () => isDragging = false);
 
     mount.addEventListener('touchstart', e => {
-        isDragging = true;
-        prevX = e.touches[0].clientX;
-        prevY = e.touches[0].clientY;
+        if (e.touches.length === 2) {
+            // Pinch start
+            const dx = e.touches[0].clientX - e.touches[1].clientX;
+            const dy = e.touches[0].clientY - e.touches[1].clientY;
+            state.pinchStartDistance = Math.sqrt(dx * dx + dy * dy);
+            isDragging = false;
+        } else {
+            isDragging = true;
+            prevX = e.touches[0].clientX;
+            prevY = e.touches[0].clientY;
+        }
     }, { passive: false });
     mount.addEventListener('touchmove', e => {
-        onMove(e.touches[0].clientX, e.touches[0].clientY);
+        if (e.touches.length === 2 && state.pinchStartDistance) {
+            // Pinch zoom
+            const dx = e.touches[0].clientX - e.touches[1].clientX;
+            const dy = e.touches[0].clientY - e.touches[1].clientY;
+            const currentDistance = Math.sqrt(dx * dx + dy * dy);
+            const delta = (state.pinchStartDistance - currentDistance) * 0.02;
+            distance = Math.max(2, Math.min(20, distance + delta));
+            state.pinchStartDistance = currentDistance;
+            updateCamera();
+        } else if (e.touches.length === 1) {
+            onMove(e.touches[0].clientX, e.touches[0].clientY);
+        }
         e.preventDefault();
     }, { passive: false });
-    mount.addEventListener('touchend', () => isDragging = false);
+    mount.addEventListener('touchend', e => {
+        isDragging = false;
+        state.pinchStartDistance = null;
+    });
+
+    // Mouse wheel zoom
+    mount.addEventListener('wheel', e => {
+        distance = Math.max(2, Math.min(20, distance + e.deltaY * 0.01));
+        updateCamera();
+        e.preventDefault();
+    }, { passive: false });
 
     // Initial positioning
     updateCamera();
