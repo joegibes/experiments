@@ -1,0 +1,97 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Hue Spatial AR Mapper</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <header class="top-bar">
+      <div>
+        <h1>Hue Spatial AR Mapper</h1>
+        <p class="subtitle">Map your room, pin lights, and review the 3D layout.</p>
+      </div>
+      <div class="status">
+        <span class="badge" id="statusBadge">Idle</span>
+        <span class="badge secondary" id="modeBadge">Setup</span>
+      </div>
+    </header>
+
+    <main class="layout">
+      <section class="panel left">
+        <div class="card">
+          <h2>1. Start AR</h2>
+          <p>Launch the AR session in Chrome on Android. Make sure you allow camera access.</p>
+          <div id="arButtonWrap"></div>
+          <div class="controls">
+            <button class="secondary" id="resetSession">Reset Session</button>
+          </div>
+        </div>
+
+        <div class="card">
+          <h2>2. Room Outline</h2>
+          <p class="muted">Tap floor points to outline the room perimeter, then confirm the ceiling height.</p>
+          <div class="controls">
+            <button id="startRoom">Start Room Mapping</button>
+            <button class="secondary" id="undoRoom">Undo Point</button>
+            <button class="secondary" id="finishRoom">Finish Room</button>
+          </div>
+          <label class="field">
+            <span>Ceiling height (meters)</span>
+            <input type="number" id="ceilingHeight" step="0.1" min="2" max="5" value="2.4" />
+          </label>
+          <div class="info" id="roomSummary">No room outline yet.</div>
+        </div>
+
+        <div class="card">
+          <h2>3. Pin Lights</h2>
+          <p class="muted">Tap the light fixture positions in AR. Rename lights in the list below.</p>
+          <div class="controls">
+            <button id="startLights">Start Pinning Lights</button>
+            <button class="secondary" id="undoLight">Undo Light</button>
+          </div>
+          <ul class="list" id="lightsList"></ul>
+        </div>
+
+        <div class="card">
+          <h2>4. Review & Export</h2>
+          <p class="muted">Review the 3D layout and submit your mapping to the server.</p>
+          <div class="controls">
+            <button id="openVisualizer">Open 3D Visualizer</button>
+            <button class="secondary" id="downloadSession">Download JSON</button>
+            <button class="primary" id="submitSession">Submit Session</button>
+          </div>
+          <div class="info" id="sessionResult">No session submitted yet.</div>
+        </div>
+      </section>
+
+      <section class="panel right">
+        <div class="card">
+          <h2>Debug Log</h2>
+          <p class="muted">Session events and metadata for debugging.</p>
+          <pre id="logOutput"></pre>
+          <div class="controls">
+            <button class="secondary" id="copyLog">Copy Log</button>
+          </div>
+        </div>
+
+        <div class="card" id="visualizerCard">
+          <h2>3D Visualizer</h2>
+          <p class="muted">Preview the room outline and light positions.</p>
+          <div id="visualizerWrap" class="visualizer"></div>
+        </div>
+      </section>
+    </main>
+
+    <div id="overlay" class="overlay hidden">
+      <div class="overlay-content">
+        <h2>3D Visualizer</h2>
+        <div id="overlayVisualizer" class="visualizer full"></div>
+        <button id="closeVisualizer" class="secondary">Close</button>
+      </div>
+    </div>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
