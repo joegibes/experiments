@@ -7,8 +7,8 @@
     <script type="importmap">
         {
             "imports": {
-                "three": "./vendor/three.module.js",
-                "three/addons/": "./vendor/"
+                "three": "https://unpkg.com/three@0.170.0/build/three.module.js",
+                "three/addons/": "https://unpkg.com/three@0.170.0/examples/jsm/"
             }
         }
     </script>
@@ -143,7 +143,7 @@
 
         function startMap() {
             menu.style.display = 'none';
-            document.getElementById('overlay-ui').style.display = 'block';
+            // Overlay UI is now managed by Mapper class (shown on session start)
             new Mapper();
         }
 

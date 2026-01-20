@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { OrbitControls } from 'three/addons/OrbitControls.js';
+import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 export class Visualizer {
     constructor() {
@@ -88,11 +88,7 @@ export class Visualizer {
         };
 
         const roomGeo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
-        roomGeo.rotateX(Math.PI / 2); // Rotate so depth becomes height (Y)
-
-        // Fix offset: Extrusion goes from Z=0 to Z=depth.
-        // After rotation, it goes from Y=0 to Y=height.
-        // Our floor points are at Y=0 (approximately).
+        roomGeo.rotateX(-Math.PI / 2); // Rotate so depth becomes height (Y)
 
         // Material: Semi-transparent walls
         const wallMat = new THREE.MeshPhysicalMaterial({

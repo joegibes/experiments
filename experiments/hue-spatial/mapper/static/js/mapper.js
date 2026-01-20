@@ -1,5 +1,5 @@
 import * as THREE from 'three';
-import { ARButton } from 'three/addons/ARButton.js';
+import { ARButton } from 'three/addons/webxr/ARButton.js';
 import { Logger } from './logger.js';
 
 export class Mapper {
@@ -63,8 +63,24 @@ export class Mapper {
     }
 
     setupAR() {
-        const button = ARButton.createButton(this.renderer, { requiredFeatures: ['hit-test'] });
+        const button = ARButton.createButton(this.renderer, {
+            requiredFeatures: ['hit-test', 'dom-overlay'],
+            domOverlay: { root: document.getElementById('overlay-ui') }
+        });
         document.body.appendChild(button);
+
+        // Handle Session Visibility
+        this.renderer.xr.addEventListener('sessionstart', () => {
+            document.getElementById('overlay-ui').style.display = 'block';
+            this.mode = 'IDLE'; // Reset/Start fresh
+            this.nextState();
+        });
+
+        this.renderer.xr.addEventListener('sessionend', () => {
+            document.getElementById('overlay-ui').style.display = 'none';
+            document.getElementById('menu').style.display = 'flex';
+        });
+
         this.renderer.setAnimationLoop((timestamp, frame) => this.render(timestamp, frame));
     }
 
@@ -233,12 +249,8 @@ export class Mapper {
                 session.addEventListener('end', () => {
                     this.hitTestSourceRequested = false;
                     this.hitTestSource = null;
-                    document.getElementById('overlay-ui').style.display = 'none';
-                    document.getElementById('menu').style.display = 'flex';
-                    this.mode = 'IDLE';
                 });
                 this.hitTestSourceRequested = true;
-                this.nextState();
             }
 
             if (this.hitTestSource) {
