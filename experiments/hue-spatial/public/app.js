@@ -1,36 +1,40 @@
-import * as THREE from "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js";
-import { ARButton } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/webxr/ARButton.js";
-import { OrbitControls } from "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/controls/OrbitControls.js";
+import * as THREE from "three";
+import { ARButton } from "three/addons/webxr/ARButton.js";
+import { OrbitControls } from "three/addons/controls/OrbitControls.js";
 
+const stepTitle = document.getElementById("stepTitle");
+const stepHint = document.getElementById("stepHint");
 const statusBadge = document.getElementById("statusBadge");
 const modeBadge = document.getElementById("modeBadge");
-const arButtonWrap = document.getElementById("arButtonWrap");
-const roomSummary = document.getElementById("roomSummary");
-const lightsList = document.getElementById("lightsList");
+const stepControls = document.getElementById("stepControls");
+const prevStepButton = document.getElementById("prevStep");
+const nextStepButton = document.getElementById("nextStep");
 const logOutput = document.getElementById("logOutput");
+const logPanel = document.getElementById("logPanel");
+const toggleLogButton = document.getElementById("toggleLog");
+const visualizerPanel = document.getElementById("visualizerPanel");
+const toggleVisualizerButton = document.getElementById("toggleVisualizer");
+const closeVisualizerButton = document.getElementById("closeVisualizer");
+const downloadSessionButton = document.getElementById("downloadSession");
+const submitSessionButton = document.getElementById("submitSession");
 const sessionResult = document.getElementById("sessionResult");
+const copyLogButton = document.getElementById("copyLog");
 const visualizerWrap = document.getElementById("visualizerWrap");
 const overlay = document.getElementById("overlay");
 const overlayVisualizer = document.getElementById("overlayVisualizer");
+const closeOverlayButton = document.getElementById("closeOverlay");
+const arStage = document.getElementById("arStage");
 
-const startRoomButton = document.getElementById("startRoom");
-const undoRoomButton = document.getElementById("undoRoom");
-const finishRoomButton = document.getElementById("finishRoom");
-const startLightsButton = document.getElementById("startLights");
-const undoLightButton = document.getElementById("undoLight");
-const resetSessionButton = document.getElementById("resetSession");
-const downloadSessionButton = document.getElementById("downloadSession");
-const submitSessionButton = document.getElementById("submitSession");
-const copyLogButton = document.getElementById("copyLog");
-const openVisualizerButton = document.getElementById("openVisualizer");
-const closeVisualizerButton = document.getElementById("closeVisualizer");
-const ceilingHeightInput = document.getElementById("ceilingHeight");
+const appVersion = "0.2.0";
 
 const sessionState = {
-  mode: "idle",
+  mode: "floor",
+  floorLocked: false,
+  floorY: 0,
   roomPoints: [],
   lights: [],
-  ceilingHeight: Number(ceilingHeightInput.value),
+  ceilingHeight: 2.4,
+  ceilingConfirmed: false,
   logs: [],
   startedAt: new Date().toISOString(),
   roomMeshes: [],
@@ -51,41 +55,8 @@ const logEvent = (message, payload = {}) => {
     .join("\n");
 };
 
-const setStatus = (status, modeLabel) => {
+const setStatus = (status) => {
   statusBadge.textContent = status;
-  modeBadge.textContent = modeLabel;
-};
-
-const updateRoomSummary = () => {
-  if (sessionState.roomPoints.length < 3) {
-    roomSummary.textContent = "No room outline yet.";
-    return;
-  }
-  const bounds = computeBounds(sessionState.roomPoints, sessionState.ceilingHeight);
-  roomSummary.textContent = `Points: ${sessionState.roomPoints.length} | Bounds: x(${bounds.minX.toFixed(
-    2
-  )}–${bounds.maxX.toFixed(2)})m, z(${bounds.minZ.toFixed(2)}–${bounds.maxZ.toFixed(2)})m`;
-};
-
-const updateLightsList = () => {
-  lightsList.innerHTML = "";
-  sessionState.lights.forEach((light, index) => {
-    const item = document.createElement("li");
-    const input = document.createElement("input");
-    input.value = light.name;
-    input.addEventListener("input", (event) => {
-      sessionState.lights[index].name = event.target.value;
-      logEvent("light_renamed", { index, name: event.target.value });
-      updateVisualizer();
-    });
-    const coords = document.createElement("span");
-    coords.textContent = `(${light.position.x.toFixed(2)}, ${light.position.y.toFixed(
-      2
-    )}, ${light.position.z.toFixed(2)})m`;
-    item.appendChild(input);
-    item.appendChild(coords);
-    lightsList.appendChild(item);
-  });
 };
 
 const computeBounds = (points, ceilingHeight) => {
@@ -104,8 +75,16 @@ const computeBounds = (points, ceilingHeight) => {
 const buildSessionPayload = () => {
   const bounds = sessionState.roomPoints.length >= 3 ? computeBounds(sessionState.roomPoints, sessionState.ceilingHeight) : null;
   return {
+    app_version: appVersion,
     started_at: sessionState.startedAt,
+    metadata: {
+      user_agent: navigator.userAgent,
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      xr_supported: !!navigator.xr,
+    },
     room: {
+      floor_locked: sessionState.floorLocked,
+      floor_y: sessionState.floorY,
       floor_points: sessionState.roomPoints,
       ceiling_height: sessionState.ceilingHeight,
       bounds,
@@ -121,6 +100,7 @@ let renderer;
 let reticle;
 let hitTestSource = null;
 let hitTestRequested = false;
+let arButtonElement = null;
 
 const roomGroup = new THREE.Group();
 const lightGroup = new THREE.Group();
@@ -132,7 +112,7 @@ const initThree = () => {
   renderer.setPixelRatio(window.devicePixelRatio);
   renderer.setSize(window.innerWidth, window.innerHeight);
   renderer.xr.enabled = true;
-  document.body.appendChild(renderer.domElement);
+  arStage.appendChild(renderer.domElement);
 
   const ambient = new THREE.HemisphereLight(0xffffff, 0x222233, 1.2);
   scene.add(ambient);
@@ -157,15 +137,15 @@ const createARButton = () => {
     optionalFeatures: ["anchors", "plane-detection", "dom-overlay"],
     domOverlay: { root: document.body },
   });
-  arButtonWrap.appendChild(button);
+  arButtonElement = button;
 
   renderer.xr.addEventListener("sessionstart", () => {
-    setStatus("AR Active", sessionState.mode);
+    setStatus("AR Active");
     logEvent("ar_session_started");
   });
 
   renderer.xr.addEventListener("sessionend", () => {
-    setStatus("AR Ended", sessionState.mode);
+    setStatus("AR Ended");
     logEvent("ar_session_ended");
     hitTestSource = null;
     hitTestRequested = false;
@@ -179,25 +159,38 @@ const createARButton = () => {
     if (sessionState.mode === "room") {
       sessionState.roomPoints.push({ x: position.x, y: 0, z: position.z });
       addRoomMarker(position);
-      updateRoomSummary();
+      buildRoomMeshes();
       logEvent("room_point_added", { position });
       updateVisualizer();
+      refreshStepUI();
     }
     if (sessionState.mode === "lights") {
       const lightIndex = sessionState.lights.length + 1;
       const light = {
         id: `light_${lightIndex}`,
         name: `Light ${lightIndex}`,
-        position: { x: position.x, y: position.y, z: position.z },
+        position: { x: position.x, y: position.y - sessionState.floorY, z: position.z },
       };
       sessionState.lights.push(light);
       addLightMarker(position);
-      updateLightsList();
       logEvent("light_added", { light });
       updateVisualizer();
+      refreshStepUI();
     }
   });
   scene.add(controller);
+};
+
+const setFloor = () => {
+  if (!reticle.visible) return;
+  const position = new THREE.Vector3();
+  position.setFromMatrixPosition(reticle.matrix);
+  sessionState.floorY = position.y;
+  sessionState.floorLocked = true;
+  roomGroup.position.y = sessionState.floorY;
+  setStatus("Floor Locked");
+  logEvent("floor_locked", { floorY: sessionState.floorY });
+  refreshStepUI();
 };
 
 const addRoomMarker = (position) => {
@@ -206,7 +199,7 @@ const addRoomMarker = (position) => {
     new THREE.MeshStandardMaterial({ color: 0x7ed6ff })
   );
   marker.position.copy(position);
-  marker.position.y = 0.01;
+  marker.position.y = sessionState.floorY + 0.01;
   roomGroup.add(marker);
   sessionState.roomMarkers.push(marker);
 };
@@ -225,6 +218,7 @@ const clearRoomMeshes = () => {
   sessionState.roomMeshes.forEach((mesh) => {
     roomGroup.remove(mesh);
     mesh.geometry.dispose();
+    mesh.material.dispose();
   });
   sessionState.roomMeshes = [];
 };
@@ -294,10 +288,16 @@ const render = (timestamp, frame) => {
         const pose = hit.getPose(referenceSpace);
         reticle.visible = true;
         reticle.matrix.fromArray(pose.transform.matrix);
+        if (!sessionState.floorLocked) {
+          setStatus("Floor Detected");
+        }
       } else {
         reticle.visible = false;
       }
     }
+  }
+  if (setFloorButtonRef) {
+    setFloorButtonRef.disabled = sessionState.floorLocked || !reticle.visible;
   }
   renderer.render(scene, camera);
 };
@@ -310,9 +310,13 @@ const onWindowResize = () => {
 };
 
 const resetSession = () => {
-  sessionState.mode = "idle";
+  sessionState.mode = "floor";
+  sessionState.floorLocked = false;
+  sessionState.floorY = 0;
   sessionState.roomPoints = [];
   sessionState.lights = [];
+  sessionState.ceilingHeight = 2.4;
+  sessionState.ceilingConfirmed = false;
   sessionState.logs = [];
   sessionState.startedAt = new Date().toISOString();
   sessionState.roomMarkers.forEach((marker) => marker.geometry.dispose());
@@ -322,52 +326,45 @@ const resetSession = () => {
   roomGroup.clear();
   lightGroup.clear();
   clearRoomMeshes();
-  updateLightsList();
-  updateRoomSummary();
+  roomGroup.position.y = 0;
   logEvent("session_reset");
-  setStatus("Idle", "Setup");
+  setStatus("Idle");
   updateVisualizer();
-};
-
-const startRoomMapping = () => {
-  sessionState.mode = "room";
-  setStatus("Mapping Room", "Room");
-  logEvent("room_mapping_started");
-};
-
-const finishRoomMapping = () => {
-  sessionState.ceilingHeight = Number(ceilingHeightInput.value) || 2.4;
-  buildRoomMeshes();
-  setStatus("Room Locked", "Room");
-  logEvent("room_mapping_finished", { ceilingHeight: sessionState.ceilingHeight });
-  updateRoomSummary();
-  updateVisualizer();
+  refreshStepUI();
 };
 
 const undoRoomPoint = () => {
   if (!sessionState.roomPoints.length) return;
   sessionState.roomPoints.pop();
   const marker = sessionState.roomMarkers.pop();
-  if (marker) marker.geometry.dispose();
-  updateRoomSummary();
+  if (marker) {
+    marker.geometry.dispose();
+  }
+  buildRoomMeshes();
   logEvent("room_point_removed");
   updateVisualizer();
-};
-
-const startLightMapping = () => {
-  sessionState.mode = "lights";
-  setStatus("Pinning Lights", "Lights");
-  logEvent("light_mapping_started");
+  refreshStepUI();
 };
 
 const undoLight = () => {
   if (!sessionState.lights.length) return;
   sessionState.lights.pop();
   const marker = sessionState.lightMarkers.pop();
-  if (marker) marker.geometry.dispose();
-  updateLightsList();
+  if (marker) {
+    marker.geometry.dispose();
+  }
   logEvent("light_removed");
   updateVisualizer();
+  refreshStepUI();
+};
+
+const confirmCeiling = (value) => {
+  sessionState.ceilingHeight = Number(value) || 2.4;
+  sessionState.ceilingConfirmed = true;
+  buildRoomMeshes();
+  logEvent("ceiling_confirmed", { ceilingHeight: sessionState.ceilingHeight });
+  updateVisualizer();
+  refreshStepUI();
 };
 
 const downloadSession = () => {
@@ -382,6 +379,30 @@ const downloadSession = () => {
   link.remove();
   URL.revokeObjectURL(url);
   logEvent("session_downloaded");
+};
+
+const buildLightList = () => {
+  const list = document.createElement("div");
+  list.className = "list";
+  sessionState.lights.forEach((light, index) => {
+    const row = document.createElement("div");
+    row.className = "list-row";
+    const input = document.createElement("input");
+    input.value = light.name;
+    input.addEventListener("input", (event) => {
+      sessionState.lights[index].name = event.target.value;
+      logEvent("light_renamed", { index, name: event.target.value });
+      updateVisualizer();
+    });
+    const coords = document.createElement("span");
+    coords.textContent = `(${light.position.x.toFixed(2)}, ${light.position.y.toFixed(
+      2
+    )}, ${light.position.z.toFixed(2)})m`;
+    row.appendChild(input);
+    row.appendChild(coords);
+    list.appendChild(row);
+  });
+  return list;
 };
 
 const submitSession = async () => {
@@ -503,8 +524,10 @@ const initVisualizer = (container) => {
 
 let updateVisualizer = () => {};
 let overlayUpdater = null;
+let visualizerUpdater = null;
+let setFloorButtonRef = null;
 
-const openVisualizerOverlay = () => {
+const openOverlay = () => {
   overlay.classList.remove("hidden");
   if (!overlayVisualizer.dataset.ready) {
     overlayUpdater = initVisualizer(overlayVisualizer);
@@ -513,42 +536,223 @@ const openVisualizerOverlay = () => {
   updateVisualizer();
 };
 
-const closeVisualizerOverlay = () => {
+const closeOverlay = () => {
   overlay.classList.add("hidden");
 };
 
-let visualizerUpdater = null;
+const steps = [
+  {
+    id: "floor",
+    title: "Scan Floor",
+    hint: "Move your phone to find the floor plane, then tap “Set Floor”.",
+    renderControls: () => {
+      stepControls.innerHTML = "";
+      const wrapper = document.createElement("div");
+      wrapper.className = "controls";
 
-const init = () => {
-  initThree();
-  createARButton();
+      const setFloorButton = document.createElement("button");
+      setFloorButtonRef = setFloorButton;
+      setFloorButton.textContent = sessionState.floorLocked ? "Floor Locked" : "Set Floor";
+      setFloorButton.disabled = sessionState.floorLocked || !reticle.visible;
+      setFloorButton.addEventListener("click", setFloor);
 
+      const resetButton = document.createElement("button");
+      resetButton.className = "secondary";
+      resetButton.textContent = "Reset Session";
+      resetButton.addEventListener("click", resetSession);
+
+      if (arButtonElement) wrapper.appendChild(arButtonElement);
+      wrapper.appendChild(setFloorButton);
+      wrapper.appendChild(resetButton);
+      stepControls.appendChild(wrapper);
+    },
+    isComplete: () => sessionState.floorLocked,
+  },
+  {
+    id: "room",
+    title: "Outline Room",
+    hint: "Tap around the room perimeter to create a floor outline.",
+    renderControls: () => {
+      stepControls.innerHTML = "";
+      const wrapper = document.createElement("div");
+      wrapper.className = "controls";
+
+      const info = document.createElement("p");
+      info.className = "muted";
+      info.textContent = `Points: ${sessionState.roomPoints.length}`;
+
+      const undoButton = document.createElement("button");
+      undoButton.className = "secondary";
+      undoButton.textContent = "Undo Point";
+      undoButton.addEventListener("click", undoRoomPoint);
+
+      wrapper.appendChild(info);
+      wrapper.appendChild(undoButton);
+      stepControls.appendChild(wrapper);
+    },
+    isComplete: () => sessionState.roomPoints.length >= 3,
+  },
+  {
+    id: "ceiling",
+    title: "Set Ceiling",
+    hint: "Confirm the ceiling height so walls can be extruded correctly.",
+    renderControls: () => {
+      stepControls.innerHTML = "";
+      const wrapper = document.createElement("div");
+      wrapper.className = "controls";
+
+      const field = document.createElement("label");
+      field.className = "field";
+      const label = document.createElement("span");
+      label.textContent = "Ceiling height (meters)";
+      const input = document.createElement("input");
+      input.type = "number";
+      input.step = "0.1";
+      input.min = "2";
+      input.max = "5";
+      input.value = sessionState.ceilingHeight;
+      field.appendChild(label);
+      field.appendChild(input);
+
+      const confirmButton = document.createElement("button");
+      confirmButton.textContent = sessionState.ceilingConfirmed ? "Ceiling Confirmed" : "Confirm Ceiling";
+      confirmButton.addEventListener("click", () => confirmCeiling(input.value));
+
+      wrapper.appendChild(field);
+      wrapper.appendChild(confirmButton);
+      stepControls.appendChild(wrapper);
+    },
+    isComplete: () => sessionState.ceilingConfirmed,
+  },
+  {
+    id: "lights",
+    title: "Pin Lights",
+    hint: "Tap each light fixture to drop a pin. Rename later in the review step.",
+    renderControls: () => {
+      stepControls.innerHTML = "";
+      const wrapper = document.createElement("div");
+      wrapper.className = "controls";
+
+      const info = document.createElement("p");
+      info.className = "muted";
+      info.textContent = `Lights pinned: ${sessionState.lights.length}`;
+
+      const undoButton = document.createElement("button");
+      undoButton.className = "secondary";
+      undoButton.textContent = "Undo Light";
+      undoButton.addEventListener("click", undoLight);
+
+      wrapper.appendChild(info);
+      wrapper.appendChild(undoButton);
+      stepControls.appendChild(wrapper);
+    },
+    isComplete: () => sessionState.lights.length >= 1,
+  },
+  {
+    id: "review",
+    title: "Review",
+    hint: "Open the 3D view, download JSON, or submit the session log.",
+    renderControls: () => {
+      stepControls.innerHTML = "";
+      const wrapper = document.createElement("div");
+      wrapper.className = "controls";
+
+      const summary = document.createElement("p");
+      summary.className = "muted";
+      summary.textContent = `Room points: ${sessionState.roomPoints.length} • Lights: ${sessionState.lights.length}`;
+
+      const openButton = document.createElement("button");
+      openButton.textContent = "Open 3D Visualizer";
+      openButton.addEventListener("click", openOverlay);
+
+      const downloadButton = document.createElement("button");
+      downloadButton.className = "secondary";
+      downloadButton.textContent = "Download JSON";
+      downloadButton.addEventListener("click", downloadSession);
+
+      const submitButton = document.createElement("button");
+      submitButton.className = "primary";
+      submitButton.textContent = "Submit Session";
+      submitButton.addEventListener("click", submitSession);
+
+      wrapper.appendChild(summary);
+      if (sessionState.lights.length) {
+        wrapper.appendChild(buildLightList());
+      }
+      wrapper.appendChild(openButton);
+      wrapper.appendChild(downloadButton);
+      wrapper.appendChild(submitButton);
+      stepControls.appendChild(wrapper);
+    },
+    isComplete: () => true,
+  },
+];
+
+let stepIndex = 0;
+
+const refreshStepUI = () => {
+  const step = steps[stepIndex];
+  stepTitle.textContent = step.title;
+  stepHint.textContent = step.hint;
+  modeBadge.textContent = `Step ${stepIndex + 1} of ${steps.length}`;
+  sessionState.mode = step.id;
+
+  step.renderControls();
+
+  prevStepButton.disabled = stepIndex === 0;
+  nextStepButton.disabled = !step.isComplete() || stepIndex === steps.length - 1;
+  logEvent("step_viewed", { step: step.id });
+};
+
+const goToStep = (index) => {
+  if (index < 0 || index >= steps.length) return;
+  stepIndex = index;
+  refreshStepUI();
+};
+
+const initVisualizerPanels = () => {
   visualizerUpdater = initVisualizer(visualizerWrap);
   updateVisualizer = () => {
     if (visualizerUpdater) visualizerUpdater();
     if (overlayUpdater) overlayUpdater();
   };
+};
 
-  resetSessionButton.addEventListener("click", resetSession);
-  startRoomButton.addEventListener("click", startRoomMapping);
-  undoRoomButton.addEventListener("click", undoRoomPoint);
-  finishRoomButton.addEventListener("click", finishRoomMapping);
-  startLightsButton.addEventListener("click", startLightMapping);
-  undoLightButton.addEventListener("click", undoLight);
-  downloadSessionButton.addEventListener("click", downloadSession);
-  submitSessionButton.addEventListener("click", submitSession);
-  copyLogButton.addEventListener("click", copyLog);
-  openVisualizerButton.addEventListener("click", openVisualizerOverlay);
-  closeVisualizerButton.addEventListener("click", closeVisualizerOverlay);
-  ceilingHeightInput.addEventListener("change", () => {
-    sessionState.ceilingHeight = Number(ceilingHeightInput.value) || 2.4;
-    buildRoomMeshes();
-    updateRoomSummary();
+const init = () => {
+  initThree();
+  createARButton();
+  initVisualizerPanels();
+
+  prevStepButton.addEventListener("click", () => goToStep(stepIndex - 1));
+  nextStepButton.addEventListener("click", () => goToStep(stepIndex + 1));
+
+  toggleLogButton.addEventListener("click", () => {
+    logPanel.classList.toggle("open");
+  });
+
+  toggleVisualizerButton.addEventListener("click", () => {
+    visualizerPanel.classList.toggle("open");
     updateVisualizer();
   });
 
-  logEvent("app_loaded");
-  setStatus("Idle", "Setup");
+  closeVisualizerButton.addEventListener("click", () => {
+    visualizerPanel.classList.remove("open");
+  });
+
+  downloadSessionButton.addEventListener("click", downloadSession);
+  submitSessionButton.addEventListener("click", submitSession);
+  copyLogButton.addEventListener("click", copyLog);
+  closeOverlayButton.addEventListener("click", closeOverlay);
+
+  logEvent("app_loaded", { appVersion });
+  setStatus("Idle");
+  refreshStepUI();
+  window.hueSpatial = {
+    sessionState,
+    goToStep,
+    refreshStepUI,
+    openOverlay,
+  };
 };
 
 init();

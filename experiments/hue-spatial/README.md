@@ -4,7 +4,7 @@ This scaffold provides a WebXR AR mapping flow for capturing room outlines and l
 
 ## What is included
 
-- **WebXR AR mapper** for Android Chrome.
+- **Step-driven AR flow** for Android Chrome (scan floor → outline room → set ceiling → pin lights → review).
 - **Room outline mapping** with floor + walls overlays.
 - **Light pinning** with meters-based XYZ coordinates.
 - **3D visualizer** for reviewing the layout.
