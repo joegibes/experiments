@@ -1,5 +1,5 @@
-import * as THREE from '../vendor/three.module.js';
-import { ARButton } from '../vendor/ARButton.js';
+import * as THREE from 'three';
+import { ARButton } from 'three/addons/ARButton.js';
 import { Logger } from './logger.js';
 
 export class Mapper {
@@ -8,6 +8,8 @@ export class Mapper {
         document.body.appendChild(this.container);
 
         this.scene = new THREE.Scene();
+
+        // AR Camera
         this.camera = new THREE.PerspectiveCamera(70, window.innerWidth / window.innerHeight, 0.01, 20);
 
         this.renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
@@ -16,15 +18,16 @@ export class Mapper {
         this.renderer.xr.enabled = true;
         this.container.appendChild(this.renderer.domElement);
 
-        // Light for the virtual scene
+        // Light
         const light = new THREE.HemisphereLight(0xffffff, 0xbbbbff, 1);
         this.scene.add(light);
 
-        // Controller / Reticle
+        // Controller
         this.controller = this.renderer.xr.getController(0);
         this.controller.addEventListener('select', () => this.onSelect());
         this.scene.add(this.controller);
 
+        // Reticle
         this.reticle = new THREE.Mesh(
             new THREE.RingGeometry(0.15, 0.2, 32).rotateX(-Math.PI / 2),
             new THREE.MeshBasicMaterial()
@@ -36,19 +39,26 @@ export class Mapper {
         // State
         this.hitTestSource = null;
         this.hitTestSourceRequested = false;
-        this.mode = 'IDLE'; // IDLE, FLOOR_CORNERS, LIGHTS
+        this.mode = 'IDLE';
 
         // Data
         this.floorPoints = [];
         this.lights = [];
-        this.ceilingHeight = 2.4; // Default
+        this.ceilingHeight = 2.4;
 
         // Visuals
         this.floorLine = null;
-        this.wallMesh = null;
-        this.lightMeshes = [];
+        this.roomMesh = null;
 
-        this.initUI();
+        this.ui = {
+            status: document.getElementById('status-text'),
+            btn: document.getElementById('action-btn')
+        };
+
+        if(this.ui.btn) {
+             this.ui.btn.onclick = () => this.nextState();
+        }
+
         this.setupAR();
     }
 
@@ -58,48 +68,20 @@ export class Mapper {
         this.renderer.setAnimationLoop((timestamp, frame) => this.render(timestamp, frame));
     }
 
-    initUI() {
-        this.ui = document.createElement('div');
-        this.ui.style.position = 'absolute';
-        this.ui.style.bottom = '20px';
-        this.ui.style.left = '0';
-        this.ui.style.width = '100%';
-        this.ui.style.textAlign = 'center';
-        this.ui.style.zIndex = '100';
-        this.ui.style.color = 'white';
-        this.ui.style.fontFamily = 'sans-serif';
-        this.ui.style.textShadow = '1px 1px 2px black';
-
-        this.statusText = document.createElement('div');
-        this.statusText.innerText = 'Start AR to begin';
-        this.ui.appendChild(this.statusText);
-
-        this.actionBtn = document.createElement('button');
-        this.actionBtn.innerText = 'Next: Define Floor';
-        this.actionBtn.style.fontSize = '1.2em';
-        this.actionBtn.style.padding = '10px 20px';
-        this.actionBtn.style.marginTop = '10px';
-        this.actionBtn.onclick = () => this.nextState();
-        this.actionBtn.style.display = 'none'; // Hidden until AR starts
-        this.ui.appendChild(this.actionBtn);
-
-        document.body.appendChild(this.ui);
-    }
-
     nextState() {
         if (this.mode === 'IDLE') {
             this.mode = 'FLOOR_CORNERS';
-            this.statusText.innerText = 'Tap on floor to mark corners. (Clockwise/Counter-Clockwise)';
-            this.actionBtn.innerText = 'Finish Floor';
+            this.ui.status.innerText = 'Tap corners to define floor.';
+            this.ui.btn.innerText = 'Finish Floor';
         } else if (this.mode === 'FLOOR_CORNERS') {
             if (this.floorPoints.length < 3) {
-                alert("Need at least 3 points for floor.");
+                this.ui.status.innerText = 'Need 3+ points!';
                 return;
             }
             this.buildRoomVisuals();
             this.mode = 'LIGHTS';
-            this.statusText.innerText = 'Tap to place lights on walls/ceiling/lamps.';
-            this.actionBtn.innerText = 'Save Map';
+            this.ui.status.innerText = 'Tap lights to place them.';
+            this.ui.btn.innerText = 'Save Map';
         } else if (this.mode === 'LIGHTS') {
             this.saveMap();
         }
@@ -123,9 +105,9 @@ export class Mapper {
     addFloorPoint(position) {
         this.floorPoints.push(position.clone());
 
-        // Visual marker
+        // Marker
         const marker = new THREE.Mesh(
-            new THREE.SphereGeometry(0.05, 16, 16),
+            new THREE.SphereGeometry(0.03, 16, 16),
             new THREE.MeshBasicMaterial({ color: 0x00ff00 })
         );
         marker.position.copy(position);
@@ -139,33 +121,51 @@ export class Mapper {
 
         if (this.floorLine) this.scene.remove(this.floorLine);
 
-        const points = [...this.floorPoints, this.floorPoints[0]]; // Close loop
+        const points = [...this.floorPoints, this.floorPoints[0]];
         const geometry = new THREE.BufferGeometry().setFromPoints(points);
-        const material = new THREE.LineBasicMaterial({ color: 0x00ff00, linewidth: 3 });
+        const material = new THREE.LineBasicMaterial({ color: 0x00ff00, linewidth: 5 });
         this.floorLine = new THREE.Line(geometry, material);
         this.scene.add(this.floorLine);
     }
 
     buildRoomVisuals() {
-        // Simple extrusion visualization
-        // In a real app we'd triangulate the floor polygon
-        // Here we just draw pillars at corners to ceiling height
+        if (this.roomMesh) this.scene.remove(this.roomMesh);
 
-        const ceilingY = this.floorPoints[0].y + this.ceilingHeight;
+        // Build Extruded Room Mesh for AR
+        const shape = new THREE.Shape();
+        // Project 3D points to 2D shape (XZ plane)
+        // We assume floor is roughly flat at the height of the first point
+        const yBase = this.floorPoints[0].y;
 
-        // Draw Walls (Wireframe)
-        for (let i = 0; i < this.floorPoints.length; i++) {
-            const p1 = this.floorPoints[i];
-            const p2 = this.floorPoints[(i + 1) % this.floorPoints.length];
+        this.floorPoints.forEach((p, i) => {
+             // Relative to first point
+             if (i===0) shape.moveTo(p.x, -p.z);
+             else shape.lineTo(p.x, -p.z);
+        });
 
-            const wallGeo = new THREE.BufferGeometry().setFromPoints([
-                p1, new THREE.Vector3(p1.x, ceilingY, p1.z),
-                new THREE.Vector3(p2.x, ceilingY, p2.z),
-                p2, p1
-            ]);
-            const wall = new THREE.Line(wallGeo, new THREE.LineBasicMaterial({ color: 0x00ffff, transparent: true, opacity: 0.5 }));
-            this.scene.add(wall);
-        }
+        const geometry = new THREE.ExtrudeGeometry(shape, {
+            steps: 1,
+            depth: this.ceilingHeight,
+            bevelEnabled: false
+        });
+        geometry.rotateX(Math.PI / 2); // Z -> Y
+
+        const material = new THREE.MeshBasicMaterial({
+            color: 0x00ffff,
+            transparent: true,
+            opacity: 0.2,
+            wireframe: false,
+            side: THREE.DoubleSide
+        });
+
+        this.roomMesh = new THREE.Mesh(geometry, material);
+        this.roomMesh.position.y = yBase;
+        this.scene.add(this.roomMesh);
+
+        // Add wireframe on top
+        const edges = new THREE.EdgesGeometry(geometry);
+        const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x00ffff }));
+        this.roomMesh.add(line);
     }
 
     addLight(position) {
@@ -173,12 +173,14 @@ export class Mapper {
         this.lights.push({ id, position: position.clone() });
 
         const mesh = new THREE.Mesh(
-            new THREE.SphereGeometry(0.1, 16, 16),
+            new THREE.SphereGeometry(0.08, 16, 16),
             new THREE.MeshBasicMaterial({ color: 0xffff00 })
         );
         mesh.position.copy(position);
         this.scene.add(mesh);
 
+        // Feedback
+        this.ui.status.innerText = `Placed Light ${this.lights.length}`;
         Logger.info('Light Added', { id, position });
     }
 
@@ -193,8 +195,7 @@ export class Mapper {
             timestamp: Date.now() / 1000
         };
 
-        Logger.info('Saving Map', data);
-        this.statusText.innerText = "Saving...";
+        this.ui.status.innerText = "Saving...";
 
         try {
             const res = await fetch('/api/save-map', {
@@ -204,16 +205,16 @@ export class Mapper {
             });
             const json = await res.json();
             if (json.status === 'success') {
-                this.statusText.innerText = "Map Saved! Check Visualizer.";
+                this.ui.status.innerText = "Saved! Loading Visualizer...";
                 setTimeout(() => {
                    window.location.href = '/?mode=visualizer';
-                }, 2000);
+                }, 1000);
             } else {
-                this.statusText.innerText = "Error Saving.";
+                this.ui.status.innerText = "Error Saving.";
             }
         } catch (e) {
             console.error(e);
-            this.statusText.innerText = "Network Error.";
+            this.ui.status.innerText = "Network Error.";
         }
     }
 
@@ -232,14 +233,12 @@ export class Mapper {
                 session.addEventListener('end', () => {
                     this.hitTestSourceRequested = false;
                     this.hitTestSource = null;
-                    this.actionBtn.style.display = 'none';
+                    document.getElementById('overlay-ui').style.display = 'none';
+                    document.getElementById('menu').style.display = 'flex';
                     this.mode = 'IDLE';
                 });
                 this.hitTestSourceRequested = true;
-
-                // Show UI once AR starts
-                this.actionBtn.style.display = 'inline-block';
-                if(this.mode === 'IDLE') this.nextState();
+                this.nextState();
             }
 
             if (this.hitTestSource) {

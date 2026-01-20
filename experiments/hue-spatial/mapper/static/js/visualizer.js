@@ -1,45 +1,61 @@
-import * as THREE from '../vendor/three.module.js';
-import { OrbitControls } from '../vendor/OrbitControls.js';
+import * as THREE from 'three';
+import { OrbitControls } from 'three/addons/OrbitControls.js';
 
 export class Visualizer {
     constructor() {
         this.container = document.createElement('div');
         document.body.appendChild(this.container);
 
+        // Cyberpunk/Dark Scene
         this.scene = new THREE.Scene();
-        this.scene.background = new THREE.Color(0x202020);
+        this.scene.background = new THREE.Color(0x121212);
+        this.scene.fog = new THREE.FogExp2(0x121212, 0.1);
 
         this.camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 100);
-        this.camera.position.set(0, 5, 5);
+        this.camera.position.set(0, 3, 5);
 
         this.renderer = new THREE.WebGLRenderer({ antialias: true });
         this.renderer.setSize(window.innerWidth, window.innerHeight);
+        this.renderer.setPixelRatio(window.devicePixelRatio);
+        this.renderer.shadowMap.enabled = true;
         this.container.appendChild(this.renderer.domElement);
 
         this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-        this.controls.target.set(0, 0, 0);
-        this.controls.update();
+        this.controls.enableDamping = true;
+        this.controls.dampingFactor = 0.05;
+        this.controls.target.set(0, 1, 0);
 
         // Lights
         const ambient = new THREE.AmbientLight(0x404040);
         this.scene.add(ambient);
+
         const dirLight = new THREE.DirectionalLight(0xffffff, 1);
         dirLight.position.set(5, 10, 5);
+        dirLight.castShadow = true;
         this.scene.add(dirLight);
 
         // Grid
-        const grid = new THREE.GridHelper(10, 10);
+        const grid = new THREE.GridHelper(20, 20, 0x444444, 0x222222);
         this.scene.add(grid);
 
         this.loadMap();
         this.animate();
 
-        // UI
+        // Back Button
+        this.addBackButton();
+    }
+
+    addBackButton() {
         const btn = document.createElement('button');
-        btn.innerText = "Back to Mapper";
+        btn.innerText = "← BACK";
         btn.style.position = "absolute";
         btn.style.top = "20px";
         btn.style.left = "20px";
+        btn.style.background = "rgba(0,0,0,0.5)";
+        btn.style.color = "white";
+        btn.style.border = "1px solid #555";
+        btn.style.padding = "10px 20px";
+        btn.style.cursor = "pointer";
         btn.onclick = () => window.location.href = "/";
         document.body.appendChild(btn);
     }
@@ -57,45 +73,72 @@ export class Visualizer {
     renderData(data) {
         if (!data.room || !data.room.floor_points) return;
 
-        // Draw Floor
+        // 1. Create Floor Shape
         const shape = new THREE.Shape();
         data.room.floor_points.forEach((p, i) => {
-            if (i === 0) shape.moveTo(p.x, -p.z); // Three.js Shape is 2D (x, y), map to x, z
+            if (i === 0) shape.moveTo(p.x, -p.z);
             else shape.lineTo(p.x, -p.z);
         });
 
-        const floorGeo = new THREE.ShapeGeometry(shape);
-        floorGeo.rotateX(Math.PI / 2); // Rotate to horizontal
-        // Floor points usually have y=height. We should align geometry y to the average y of floor points
-        const avgY = data.room.floor_points[0].y;
-        floorGeo.translate(0, avgY, 0); // Move to actual height
+        // 2. Extrude Room (Walls)
+        const extrudeSettings = {
+            steps: 1,
+            depth: data.room.ceiling_height, // This extrudes in Z (which we'll rotate to Y)
+            bevelEnabled: false
+        };
 
-        const floorMesh = new THREE.Mesh(floorGeo, new THREE.MeshLambertMaterial({ color: 0x555555, side: THREE.DoubleSide }));
-        this.scene.add(floorMesh);
+        const roomGeo = new THREE.ExtrudeGeometry(shape, extrudeSettings);
+        roomGeo.rotateX(Math.PI / 2); // Rotate so depth becomes height (Y)
 
-        // Draw Ceiling (Wireframe)
-        const ceilingGeo = floorGeo.clone();
-        ceilingGeo.translate(0, data.room.ceiling_height, 0);
-        const ceilingMesh = new THREE.Mesh(ceilingGeo, new THREE.MeshBasicMaterial({ color: 0xaaaaaa, wireframe: true }));
-        this.scene.add(ceilingMesh);
+        // Fix offset: Extrusion goes from Z=0 to Z=depth.
+        // After rotation, it goes from Y=0 to Y=height.
+        // Our floor points are at Y=0 (approximately).
 
-        // Draw Lights
+        // Material: Semi-transparent walls
+        const wallMat = new THREE.MeshPhysicalMaterial({
+            color: 0x8888ff,
+            metalness: 0.1,
+            roughness: 0.1,
+            transparent: true,
+            opacity: 0.1,
+            side: THREE.DoubleSide,
+            depthWrite: false
+        });
+
+        const roomMesh = new THREE.Mesh(roomGeo, wallMat);
+        // Align floor
+        if (data.room.floor_points.length > 0) {
+             roomMesh.position.y = data.room.floor_points[0].y;
+        }
+        this.scene.add(roomMesh);
+
+        // 3. Wireframe outline for walls
+        const edges = new THREE.EdgesGeometry(roomGeo);
+        const line = new THREE.LineSegments(edges, new THREE.LineBasicMaterial({ color: 0x8888ff, opacity: 0.3, transparent: true }));
+        line.position.copy(roomMesh.position);
+        this.scene.add(line);
+
+
+        // 4. Lights
         data.lights.forEach(light => {
-            const sphere = new THREE.Mesh(
-                new THREE.SphereGeometry(0.15, 16, 16),
-                new THREE.MeshStandardMaterial({ color: 0xffff00, emissive: 0x888800 })
-            );
-            sphere.position.set(light.position.x, light.position.y, light.position.z);
-            this.scene.add(sphere);
+            const group = new THREE.Group();
+            group.position.set(light.position.x, light.position.y, light.position.z);
 
-            // Add Label (simple approach: stick)
-            const stick = new THREE.Mesh(
-                new THREE.CylinderGeometry(0.01, 0.01, 0.5),
-                new THREE.MeshBasicMaterial({ color: 0xffff00 })
+            // Bulb
+            const sphere = new THREE.Mesh(
+                new THREE.SphereGeometry(0.1, 32, 32),
+                new THREE.MeshStandardMaterial({ color: 0xffaa00, emissive: 0xffaa00, emissiveIntensity: 2 })
             );
-            stick.position.copy(sphere.position);
-            stick.position.y -= 0.25;
-            this.scene.add(stick);
+            group.add(sphere);
+
+            // Light Source (Actual Light)
+            const pointLight = new THREE.PointLight(0xffaa00, 1, 5);
+            group.add(pointLight);
+
+            // Glow Sprite
+            // (Optional, skip for now to keep simple)
+
+            this.scene.add(group);
         });
 
         console.log("Scene rendered", data);
@@ -103,6 +146,7 @@ export class Visualizer {
 
     animate() {
         requestAnimationFrame(() => this.animate());
+        this.controls.update();
         this.renderer.render(this.scene, this.camera);
     }
 }

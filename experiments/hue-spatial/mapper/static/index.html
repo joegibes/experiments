@@ -7,29 +7,132 @@
     <script type="importmap">
         {
             "imports": {
-                "three": "./vendor/three.module.js"
+                "three": "./vendor/three.module.js",
+                "three/addons/": "./vendor/"
             }
         }
     </script>
     <style>
-        body { margin: 0; overflow: hidden; background: #000; color: white; font-family: sans-serif; }
+        :root {
+            --hue-purple: #6200ea;
+            --hue-orange: #ff6d00;
+            --hue-bg: #121212;
+            --hue-card: #1e1e1e;
+            --hue-text: #ffffff;
+        }
+        body { margin: 0; overflow: hidden; background: var(--hue-bg); color: var(--hue-text); font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif; }
+
         #menu {
             position: absolute; top: 0; left: 0; width: 100%; height: 100%;
             display: flex; flex-direction: column; justify-content: center; align-items: center;
-            background: rgba(0,0,0,0.8); z-index: 10;
+            background: linear-gradient(135deg, #000000 0%, #1a1a2e 100%);
+            z-index: 10;
         }
+
+        .card {
+            background: rgba(30, 30, 30, 0.8);
+            backdrop-filter: blur(10px);
+            padding: 40px;
+            border-radius: 20px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            text-align: center;
+            box-shadow: 0 10px 30px rgba(0,0,0,0.5);
+            max-width: 90%;
+            width: 400px;
+        }
+
+        h1 {
+            font-weight: 300;
+            margin-bottom: 10px;
+            letter-spacing: 2px;
+            background: linear-gradient(90deg, var(--hue-orange), var(--hue-purple));
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        p { color: #aaa; margin-bottom: 30px; }
+
         button {
-            padding: 15px 30px; margin: 10px; font-size: 1.2em;
-            background: #333; color: white; border: 1px solid #555; border-radius: 5px; cursor: pointer;
+            display: block;
+            width: 100%;
+            padding: 15px;
+            margin: 10px 0;
+            font-size: 1.1em;
+            background: rgba(255,255,255,0.05);
+            color: white;
+            border: 1px solid rgba(255,255,255,0.2);
+            border-radius: 12px;
+            cursor: pointer;
+            transition: all 0.3s ease;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
         }
-        button:hover { background: #555; }
+
+        button:hover {
+            background: rgba(255,255,255,0.1);
+            border-color: var(--hue-purple);
+            transform: translateY(-2px);
+            box-shadow: 0 5px 15px rgba(98, 0, 234, 0.3);
+        }
+
+        button#btn-map { border-color: var(--hue-orange); }
+        button#btn-map:hover { box-shadow: 0 5px 15px rgba(255, 109, 0, 0.3); }
+
+        #overlay-ui {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            text-align: center;
+            pointer-events: none;
+            width: 100%;
+            z-index: 100;
+        }
+
+        .status-pill {
+            display: inline-block;
+            background: rgba(0,0,0,0.6);
+            backdrop-filter: blur(5px);
+            padding: 10px 20px;
+            border-radius: 30px;
+            border: 1px solid rgba(255,255,255,0.1);
+            margin-bottom: 15px;
+            font-size: 1.1em;
+            text-shadow: 0 2px 4px rgba(0,0,0,0.5);
+        }
+
+        .action-btn {
+            pointer-events: auto;
+            display: inline-block;
+            width: auto;
+            padding: 12px 30px;
+            background: var(--hue-purple);
+            border: none;
+            box-shadow: 0 4px 10px rgba(0,0,0,0.3);
+        }
+
+        .action-btn:hover {
+            background: #7c4dff;
+        }
+
     </style>
 </head>
 <body>
     <div id="menu">
-        <h1>Hue Spatial Mapper</h1>
-        <button id="btn-map">Start AR Mapping</button>
-        <button id="btn-viz">View 3D Model</button>
+        <div class="card">
+            <h1>SPATIAL MAPPER</h1>
+            <p>Define your room geometry and light positions.</p>
+            <button id="btn-map">Start AR Mapping</button>
+            <button id="btn-viz">View 3D Model</button>
+        </div>
+    </div>
+
+    <!-- UI Overlay for Mapper -->
+    <div id="overlay-ui" style="display:none;">
+        <div id="status-text" class="status-pill">Initializing...</div>
+        <br>
+        <button id="action-btn" class="action-btn">Next Step</button>
     </div>
 
     <script type="module">
@@ -40,6 +143,7 @@
 
         function startMap() {
             menu.style.display = 'none';
+            document.getElementById('overlay-ui').style.display = 'block';
             new Mapper();
         }
 
