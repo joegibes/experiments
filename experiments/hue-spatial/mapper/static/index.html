@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <title>Hue Spatial Mapper</title>
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "./vendor/three.module.js"
+            }
+        }
+    </script>
+    <style>
+        body { margin: 0; overflow: hidden; background: #000; color: white; font-family: sans-serif; }
+        #menu {
+            position: absolute; top: 0; left: 0; width: 100%; height: 100%;
+            display: flex; flex-direction: column; justify-content: center; align-items: center;
+            background: rgba(0,0,0,0.8); z-index: 10;
+        }
+        button {
+            padding: 15px 30px; margin: 10px; font-size: 1.2em;
+            background: #333; color: white; border: 1px solid #555; border-radius: 5px; cursor: pointer;
+        }
+        button:hover { background: #555; }
+    </style>
+</head>
+<body>
+    <div id="menu">
+        <h1>Hue Spatial Mapper</h1>
+        <button id="btn-map">Start AR Mapping</button>
+        <button id="btn-viz">View 3D Model</button>
+    </div>
+
+    <script type="module">
+        import { Mapper } from './js/mapper.js';
+        import { Visualizer } from './js/visualizer.js';
+
+        const menu = document.getElementById('menu');
+
+        function startMap() {
+            menu.style.display = 'none';
+            new Mapper();
+        }
+
+        function startViz() {
+            menu.style.display = 'none';
+            new Visualizer();
+        }
+
+        document.getElementById('btn-map').addEventListener('click', startMap);
+        document.getElementById('btn-viz').addEventListener('click', startViz);
+
+        // Check URL for mode
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('mode') === 'visualizer') {
+            startViz();
+        }
+    </script>
+</body>
+</html>
