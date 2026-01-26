@@ -1,0 +1,78 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover" />
+    <title>Hue Spatial AR Mapper</title>
+    <link rel="stylesheet" href="styles.css" />
+    <script type="importmap">
+      {
+        "imports": {
+          "three": "https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.module.js",
+          "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.160.0/examples/jsm/"
+        }
+      }
+    </script>
+  </head>
+  <body>
+    <div id="arStage"></div>
+
+    <header class="hud hud-top">
+      <div>
+        <p class="eyebrow">Hue Spatial AR Mapper</p>
+        <h1 id="stepTitle">Scan Floor</h1>
+        <p class="subtitle" id="stepHint">Move your phone to find the floor plane, then tap “Set Floor”.</p>
+      </div>
+      <div class="status">
+        <span class="badge" id="statusBadge">Idle</span>
+        <span class="badge secondary" id="modeBadge">Step 1 of 5</span>
+      </div>
+    </header>
+
+    <section class="hud hud-bottom">
+      <div class="card">
+        <div id="stepControls"></div>
+        <div class="nav">
+          <button class="secondary" id="prevStep">Back</button>
+          <button class="primary" id="nextStep">Next</button>
+        </div>
+      </div>
+    </section>
+
+    <aside class="hud hud-right">
+      <button class="secondary" id="toggleLog">Logs</button>
+      <button class="secondary" id="toggleVisualizer">3D View</button>
+    </aside>
+
+    <section class="panel" id="logPanel">
+      <div class="panel-header">
+        <h2>Debug Log</h2>
+        <button class="secondary" id="copyLog">Copy</button>
+      </div>
+      <pre id="logOutput"></pre>
+    </section>
+
+    <section class="panel" id="visualizerPanel">
+      <div class="panel-header">
+        <h2>3D Visualizer</h2>
+        <button class="secondary" id="closeVisualizer">Close</button>
+      </div>
+      <div id="visualizerWrap" class="visualizer"></div>
+      <div class="panel-footer">
+        <button class="secondary" id="downloadSession">Download JSON</button>
+        <button class="primary" id="submitSession">Submit Session</button>
+        <p class="muted" id="sessionResult">No session submitted yet.</p>
+      </div>
+    </section>
+
+    <div id="overlay" class="overlay hidden">
+      <div class="overlay-content">
+        <h2>3D Visualizer</h2>
+        <div id="overlayVisualizer" class="visualizer full"></div>
+        <button id="closeOverlay" class="secondary">Close</button>
+      </div>
+    </div>
+
+    <script type="module" src="app.js"></script>
+  </body>
+</html>
