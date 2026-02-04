@@ -1,0 +1,76 @@
+{
+  "cabin": {
+    "lewiston_hq": {
+      "distanceKm": 34.0,
+      "durationMinutes": 34
+    },
+    "atlanta_hq": {
+      "distanceKm": 31.8,
+      "durationMinutes": 24
+    },
+    "huff": {
+      "distanceKm": 53.1,
+      "durationMinutes": 55
+    },
+    "meaford": {
+      "distanceKm": 41.7,
+      "durationMinutes": 42
+    },
+    "sage_lake": {
+      "distanceKm": 23.1,
+      "durationMinutes": 28
+    },
+    "avery_lake": {
+      "distanceKm": 27.4,
+      "durationMinutes": 30
+    },
+    "hunt_creek": {
+      "distanceKm": 16.4,
+      "durationMinutes": 24
+    }
+  },
+  "lewiston_hq": {
+    "huff": {
+      "distanceKm": 26.7,
+      "durationMinutes": 33
+    },
+    "meaford": {
+      "distanceKm": 30.2,
+      "durationMinutes": 45
+    },
+    "sage_lake": {
+      "distanceKm": 22.0,
+      "durationMinutes": 30
+    },
+    "avery_lake": {
+      "distanceKm": 11.4,
+      "durationMinutes": 16
+    },
+    "hunt_creek": {
+      "distanceKm": 15.7,
+      "durationMinutes": 23
+    }
+  },
+  "atlanta_hq": {
+    "huff": {
+      "distanceKm": 21.4,
+      "durationMinutes": 32
+    },
+    "meaford": {
+      "distanceKm": 9.9,
+      "durationMinutes": 19
+    },
+    "sage_lake": {
+      "distanceKm": 11.3,
+      "durationMinutes": 21
+    },
+    "avery_lake": {
+      "distanceKm": 16.1,
+      "durationMinutes": 32
+    },
+    "hunt_creek": {
+      "distanceKm": 31.1,
+      "durationMinutes": 33
+    }
+  }
+}
