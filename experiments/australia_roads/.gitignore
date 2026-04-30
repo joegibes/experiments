@@ -1,8 +1,0 @@
-*.zip
-*.shp
-*.parquet
-*.cpg
-*.dbf
-*.prj
-*.shx
-data/
