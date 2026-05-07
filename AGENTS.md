@@ -5,3 +5,6 @@ This repo is for general "vibe coding" projects: web apps, tools, scripts, webpa
 
 ## Structure
 Use a subfolder for each project. Work out of that subfolder - you don't need to talk to any of the other subfolders; that will just pollute the context window.
+
+## Subfolder instructions
+Before working inside a project subfolder, check whether that subfolder (or any nested directory you will touch) has its own `AGENTS.md`, and follow the more-specific instructions there.
