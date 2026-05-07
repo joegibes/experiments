@@ -1,0 +1,19 @@
+{
+  "sourceRepo": "https://github.com/stpierrs/conceptual_flat_earth_model/",
+  "observer": { "latDeg": 32.0, "lonDeg": -100.8387 },
+  "dateIso": "2026-05-07T00:00:00.000Z",
+  "assumptions": {
+    "worldModel": "fe",
+    "refraction": "off",
+    "sunMoonPlanets": "Ptolemy-only ephemeris path from the audited app",
+    "starSample": "Sirius, apparent-of-date corrections as described in the audited app"
+  },
+  "bodies": [
+    { "label": "Sun", "raDeg": 34.367, "decDeg": 14.016, "vaultZ": 0.680, "opticalAzDeg": 281.77, "opticalElDeg": 7.67, "lineToVaultAzDeg": 307.13, "lineToVaultElDeg": 52.09, "separationDeg": 49.04 },
+    { "label": "Moon", "raDeg": 274.408, "decDeg": -27.666, "vaultZ": 0.568, "opticalAzDeg": 88.13, "opticalElDeg": -64.04, "lineToVaultAzDeg": 19.93, "lineToVaultElDeg": 30.93, "separationDeg": 108.82 },
+    { "label": "Mars", "raDeg": 11.743, "decDeg": 5.000, "vaultZ": 0.661, "opticalAzDeg": 286.55, "opticalElDeg": -15.90, "lineToVaultAzDeg": 318.91, "lineToVaultElDeg": 44.83, "separationDeg": 67.49 },
+    { "label": "Jupiter", "raDeg": 104.674, "decDeg": 23.249, "vaultZ": 0.682, "opticalAzDeg": 247.72, "opticalElDeg": 70.80, "lineToVaultAzDeg": 257.29, "lineToVaultElDeg": 79.54, "separationDeg": 9.05 },
+    { "label": "Saturn", "raDeg": 2.810, "decDeg": -0.893, "vaultZ": 0.647, "opticalAzDeg": 286.99, "opticalElDeg": -26.59, "lineToVaultAzDeg": 323.51, "lineToVaultElDeg": 41.71, "separationDeg": 76.19 },
+    { "label": "Sirius", "raDeg": 101.580, "decDeg": -16.746, "vaultZ": 0.485, "opticalAzDeg": 207.12, "opticalElDeg": 36.72, "lineToVaultAzDeg": 225.05, "lineToVaultElDeg": 56.60, "separationDeg": 23.22 }
+  ]
+}
