@@ -57,9 +57,21 @@ The Sun example shows the difference in a concrete way:
 
 ![3D dome ray mismatch](visuals/dome-ray-mismatch-3d.svg)
 
-This 3D-style view puts the flat map, the whole-world dome, the observer's local optical dome, and the optical sightlines in one frame. Orange/yellow points are the whole-world vault markers. Cyan points show where the observer-optical ray reaches the same height plane; red dashed segments are the resulting miss distances on the vault. Downward red rays mark below-horizon optical positions that cannot reach the upper dome in straight FE geometry.
+This 3D-style view puts the flat map, the whole-world dome, the observer's local optical dome, and the optical sightlines in one frame. Orange/yellow points are the whole-world vault markers. Cyan paths show rays projected from the observer through the observed optical-dome positions and out toward the whole-world vault. Red dashed segments show the remaining miss distance. Downward red rays mark below-horizon optical positions that cannot reach the upper dome in straight FE geometry.
 
-The scene includes the Sun, Moon, Mars, Jupiter, Saturn, and five bright stars (Sirius, Polaris, Arcturus, Vega, and Betelgeuse) so the mismatch is visible without turning the diagram into a cloud of labels.
+The scene uses the cloned app source's default observer position and a default-load date snapshot generated from the app model. It includes the Sun, Moon, Mars, Jupiter, Saturn, and five bright stars (Sirius, Polaris, Arcturus, Vega, and Betelgeuse) so the mismatch is visible without turning the diagram into a cloud of labels. Large off-map misses are clipped and labeled rather than drawn as giant confusing diagonals.
+
+## Future app-integration brainstorm
+
+Do **not** implement this yet, but the visualization suggests a useful debug overlay for the original app:
+
+- Add a toggle such as `Show FE sightline error`.
+- For each tracked body, draw the straight ray from the observer through the current optical-vault marker.
+- Mark where that straight ray intersects the body's whole-world vault-height plane or dome shell.
+- Draw a red miss segment from that intersection to the body's actual whole-world vault marker.
+- Optionally draw a distinct curved/warped ray from the whole-world marker to the observed optical position, clearly labeled as a hypothetical/required bending path rather than a modeled optical law.
+
+That would make the mismatch inspectable inside the app without claiming the curved ray is physically justified.
 
 ## Code-path summary from the audited app
 
@@ -107,7 +119,9 @@ The main optical render paths for Sun, Moon, planets, and stars do not use that 
 ## Files in this folder
 
 - `README.md` — this report.
+- `source/` — dead cloned text/source-code snapshot of `stpierrs/conceptual_flat_earth_model`, with binary image assets intentionally omitted.
 - `pipeline-sample-data.json` — deterministic sample values used by the visuals.
+- `generate_sample_data.mjs` — regenerates sample data from the cloned app modules using the committed default-load snapshot; pass `--use-app-now` to refresh from the app's dynamic current-date default.
 - `generate_visuals.py` — regenerates the three 2D SVG visuals from the JSON data.
 - `generate_3d_dome_visual.py` — regenerates the 3D-style dome/ray mismatch SVG.
 - `visuals/pipeline-overview.svg` — visual pipeline split.

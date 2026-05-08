@@ -1,19 +1,417 @@
 {
-  "sourceRepo": "https://github.com/stpierrs/conceptual_flat_earth_model/",
-  "observer": { "latDeg": 32.0, "lonDeg": -100.8387 },
-  "dateIso": "2026-05-07T00:00:00.000Z",
-  "assumptions": {
-    "worldModel": "fe",
-    "refraction": "off",
-    "sunMoonPlanets": "Ptolemy-only ephemeris path from the audited app",
-    "starSample": "Sirius, apparent-of-date corrections as described in the audited app"
+  "generatedFrom": "conceptual_flat_earth_model_audit/source cloned app modules",
+  "appDefaultSnapshot": true,
+  "dateMode": "replayed-committed-default-load-snapshot",
+  "observer": {
+    "latDeg": 32,
+    "lonDeg": -100.8387
   },
+  "dateIso": "2026-05-07T23:49:57.784Z",
+  "stateDefaultsUsed": {
+    "worldModel": "fe",
+    "bodySource": "ptolemy",
+    "refraction": "off",
+    "starTrepidation": true,
+    "starfieldVaultHeight": 0.485,
+    "vaultHeight": 0.75,
+    "vaultSize": 1,
+    "opticalVaultSize": 0.5,
+    "opticalVaultHeight": 0.5
+  },
+  "gmstDeg": 223.321971,
+  "observerFeCoord": [
+    -0.060592,
+    -0.316474,
+    0
+  ],
   "bodies": [
-    { "label": "Sun", "raDeg": 34.367, "decDeg": 14.016, "vaultZ": 0.680, "opticalAzDeg": 281.77, "opticalElDeg": 7.67, "lineToVaultAzDeg": 307.13, "lineToVaultElDeg": 52.09, "separationDeg": 49.04 },
-    { "label": "Moon", "raDeg": 274.408, "decDeg": -27.666, "vaultZ": 0.568, "opticalAzDeg": 88.13, "opticalElDeg": -64.04, "lineToVaultAzDeg": 19.93, "lineToVaultElDeg": 30.93, "separationDeg": 108.82 },
-    { "label": "Mars", "raDeg": 11.743, "decDeg": 5.000, "vaultZ": 0.661, "opticalAzDeg": 286.55, "opticalElDeg": -15.90, "lineToVaultAzDeg": 318.91, "lineToVaultElDeg": 44.83, "separationDeg": 67.49 },
-    { "label": "Jupiter", "raDeg": 104.674, "decDeg": 23.249, "vaultZ": 0.682, "opticalAzDeg": 247.72, "opticalElDeg": 70.80, "lineToVaultAzDeg": 257.29, "lineToVaultElDeg": 79.54, "separationDeg": 9.05 },
-    { "label": "Saturn", "raDeg": 2.810, "decDeg": -0.893, "vaultZ": 0.647, "opticalAzDeg": 286.99, "opticalElDeg": -26.59, "lineToVaultAzDeg": 323.51, "lineToVaultElDeg": 41.71, "separationDeg": 76.19 },
-    { "label": "Sirius", "raDeg": 101.580, "decDeg": -16.746, "vaultZ": 0.485, "opticalAzDeg": 207.12, "opticalElDeg": 36.72, "lineToVaultAzDeg": 225.05, "lineToVaultElDeg": 56.60, "separationDeg": 23.22 }
+    {
+      "id": "sun",
+      "label": "Sun",
+      "category": "body",
+      "raDeg": 35.285039,
+      "decDeg": 14.32927,
+      "vaultCoord": [
+        -0.416264,
+        0.058776,
+        0.680507
+      ],
+      "opticalAngles": {
+        "azimuth": 280.810585,
+        "elevation": 9.864302
+      },
+      "opticalLocalGlobe": [
+        0.17131529738450355,
+        -0.9677312430987377,
+        0.18478990776725573
+      ],
+      "vaultZ": 0.680507,
+      "opticalAzDeg": 280.810585,
+      "opticalElDeg": 9.864302,
+      "lineToVaultAzDeg": 305.695617,
+      "lineToVaultElDeg": 52.773717,
+      "separationDeg": 47.383115,
+      "feLineAngles": {
+        "azimuth": 305.695617,
+        "elevation": 52.773717
+      },
+      "rayAtVaultZ": [
+        -3.698052,
+        1.127319,
+        0.680507
+      ],
+      "rayMode": "above-horizon",
+      "missDistance": 3.451365
+    },
+    {
+      "id": "moon",
+      "label": "Moon",
+      "category": "body",
+      "raDeg": 287.744496,
+      "decDeg": -25.988335,
+      "vaultCoord": [
+        0.278199,
+        0.581232,
+        0.573529
+      ],
+      "opticalAngles": {
+        "azimuth": 68.7226,
+        "elevation": -75.793577
+      },
+      "opticalLocalGlobe": [
+        -0.9694178441646494,
+        0.2286871383238958,
+        0.08905748806468061
+      ],
+      "vaultZ": 0.573529,
+      "opticalAzDeg": 68.7226,
+      "opticalElDeg": -75.793577,
+      "lineToVaultAzDeg": 9.837627,
+      "lineToVaultElDeg": 30.868148,
+      "separationDeg": 112.862253,
+      "feLineAngles": {
+        "azimuth": 9.837627,
+        "elevation": 30.868148
+      },
+      "rayAtVaultZ": [
+        0.021468,
+        -0.301356,
+        -0.329602
+      ],
+      "rayMode": "below-horizon",
+      "missDistance": null
+    },
+    {
+      "id": "mars",
+      "label": "Mars",
+      "category": "body",
+      "raDeg": 12.436233,
+      "decDeg": 5.296818,
+      "vaultCoord": [
+        -0.403843,
+        0.241558,
+        0.661771
+      ],
+      "opticalAngles": {
+        "azimuth": 285.486037,
+        "elevation": -13.918571
+      },
+      "opticalLocalGlobe": null,
+      "celestCoord": [
+        0.9723663083820833,
+        0.2144333261058601,
+        0.09231528030925928
+      ],
+      "vaultZ": 0.661771,
+      "opticalAzDeg": 285.486037,
+      "opticalElDeg": -13.918571,
+      "lineToVaultAzDeg": 317.565275,
+      "lineToVaultElDeg": 45.288075,
+      "separationDeg": 65.941044,
+      "feLineAngles": {
+        "azimuth": 317.565275,
+        "elevation": 45.288075
+      },
+      "rayAtVaultZ": [
+        -0.356385,
+        -0.170125,
+        -0.081785
+      ],
+      "rayMode": "below-horizon",
+      "missDistance": null
+    },
+    {
+      "id": "jupiter",
+      "label": "Jupiter",
+      "category": "body",
+      "raDeg": 104.827633,
+      "decDeg": 23.235874,
+      "vaultCoord": [
+        -0.176952,
+        -0.325981,
+        0.682611
+      ],
+      "opticalAngles": {
+        "azimuth": 245.089015,
+        "elevation": 72.104418
+      },
+      "opticalLocalGlobe": null,
+      "celestCoord": [
+        -0.2351546154141656,
+        0.8882895904042963,
+        0.39451731321804295
+      ],
+      "vaultZ": 0.682611,
+      "opticalAzDeg": 245.089015,
+      "opticalElDeg": 72.104418,
+      "lineToVaultAzDeg": 254.490292,
+      "lineToVaultElDeg": 80.294592,
+      "separationDeg": 8.46542,
+      "feLineAngles": {
+        "azimuth": 254.490292,
+        "elevation": 80.294592
+      },
+      "rayAtVaultZ": [
+        -0.274397,
+        -0.370068,
+        0.682611
+      ],
+      "rayMode": "above-horizon",
+      "missDistance": 0.106954
+    },
+    {
+      "id": "saturn",
+      "label": "Saturn",
+      "category": "body",
+      "raDeg": 2.916208,
+      "decDeg": -0.851293,
+      "vaultCoord": [
+        -0.384338,
+        0.327164,
+        0.647458
+      ],
+      "opticalAngles": {
+        "azimuth": 285.968236,
+        "elevation": -25.232312
+      },
+      "opticalLocalGlobe": null,
+      "celestCoord": [
+        0.9985947721735899,
+        0.050869844858397135,
+        -0.014857317108365777
+      ],
+      "vaultZ": 0.647458,
+      "opticalAzDeg": 285.968236,
+      "opticalElDeg": -25.232312,
+      "lineToVaultAzDeg": 322.459197,
+      "lineToVaultElDeg": 41.94469,
+      "separationDeg": 75.16839,
+      "feLineAngles": {
+        "azimuth": 322.459197,
+        "elevation": 41.94469
+      },
+      "rayAtVaultZ": [
+        -0.335099,
+        -0.177769,
+        -0.144938
+      ],
+      "rayMode": "below-horizon",
+      "missDistance": null
+    },
+    {
+      "id": "star:sirius",
+      "label": "Sirius",
+      "category": "star",
+      "raDeg": 101.579785,
+      "decDeg": -16.745768,
+      "vaultCoord": [
+        -0.311993,
+        -0.504329,
+        0.485
+      ],
+      "opticalAngles": {
+        "azimuth": 205.435546,
+        "elevation": 37.297391
+      },
+      "opticalLocalGlobe": null,
+      "celestCoord": [
+        -0.1922197723824542,
+        0.9381019303534469,
+        -0.2881255409927662
+      ],
+      "vaultZ": 0.485,
+      "opticalAzDeg": 205.435546,
+      "opticalElDeg": 37.297391,
+      "lineToVaultAzDeg": 222.393029,
+      "lineToVaultElDeg": 57.09389,
+      "separationDeg": 22.763257,
+      "feLineAngles": {
+        "azimuth": 222.393029,
+        "elevation": 57.09389
+      },
+      "rayAtVaultZ": [
+        -0.437304,
+        -0.829789,
+        0.485
+      ],
+      "rayMode": "above-horizon",
+      "missDistance": 0.348751
+    },
+    {
+      "id": "star:polaris",
+      "label": "Polaris",
+      "category": "star",
+      "raDeg": 45.999341,
+      "decDeg": 89.374815,
+      "vaultCoord": [
+        -0.003469,
+        -0.000162,
+        0.485
+      ],
+      "opticalAngles": {
+        "azimuth": 359.282078,
+        "elevation": 32.144096
+      },
+      "opticalLocalGlobe": null,
+      "celestCoord": [
+        0.007579725714531861,
+        0.007848855092061412,
+        0.9999404698439984
+      ],
+      "vaultZ": 0.485,
+      "opticalAzDeg": 359.282078,
+      "opticalElDeg": 32.144096,
+      "lineToVaultAzDeg": 359.398016,
+      "lineToVaultElDeg": 56.466029,
+      "separationDeg": 24.322066,
+      "feLineAngles": {
+        "azimuth": 359.398016,
+        "elevation": 56.466029
+      },
+      "rayAtVaultZ": [
+        0.075038,
+        0.443352,
+        0.485
+      ],
+      "rayMode": "above-horizon",
+      "missDistance": 0.450409
+    },
+    {
+      "id": "star:arcturus",
+      "label": "Arcturus",
+      "category": "star",
+      "raDeg": 214.232031,
+      "decDeg": 19.057969,
+      "vaultCoord": [
+        0.389173,
+        -0.062265,
+        0.485
+      ],
+      "opticalAngles": {
+        "azimuth": 72.814104,
+        "elevation": 8.544088
+      },
+      "opticalLocalGlobe": null,
+      "celestCoord": [
+        -0.7814500789602101,
+        -0.5317118133604485,
+        0.3265246110571529
+      ],
+      "vaultZ": 0.485,
+      "opticalAzDeg": 72.814104,
+      "opticalElDeg": 8.544088,
+      "lineToVaultAzDeg": 49.686029,
+      "lineToVaultElDeg": 43.191068,
+      "separationDeg": 40.117521,
+      "feLineAngles": {
+        "azimuth": 49.686029,
+        "elevation": 43.191068
+      },
+      "rayAtVaultZ": [
+        3.147836,
+        0.040415,
+        0.485
+      ],
+      "rayMode": "above-horizon",
+      "missDistance": 2.760573
+    },
+    {
+      "id": "star:vega",
+      "label": "Vega",
+      "category": "star",
+      "raDeg": 279.4607,
+      "decDeg": 38.801544,
+      "vaultCoord": [
+        0.158483,
+        0.236192,
+        0.485
+      ],
+      "opticalAngles": {
+        "azimuth": 18.489069,
+        "elevation": -16.033595
+      },
+      "opticalLocalGlobe": null,
+      "celestCoord": [
+        0.12809782479437337,
+        -0.768721200723607,
+        0.6266248182453403
+      ],
+      "vaultZ": 0.485,
+      "opticalAzDeg": 18.489069,
+      "opticalElDeg": -16.033595,
+      "lineToVaultAzDeg": 10.784527,
+      "lineToVaultElDeg": 39.207812,
+      "separationDeg": 55.708942,
+      "feLineAngles": {
+        "azimuth": 10.784527,
+        "elevation": 39.207812
+      },
+      "rayAtVaultZ": [
+        0.099463,
+        -0.031582,
+        -0.093908
+      ],
+      "rayMode": "below-horizon",
+      "missDistance": null
+    },
+    {
+      "id": "star:betelgeuse",
+      "label": "Betelgeuse",
+      "category": "star",
+      "raDeg": 89.146811,
+      "decDeg": 7.410999,
+      "vaultCoord": [
+        -0.319736,
+        -0.329077,
+        0.485
+      ],
+      "opticalAngles": {
+        "azimuth": 238.830877,
+        "elevation": 50.438554
+      },
+      "opticalLocalGlobe": null,
+      "celestCoord": [
+        0.014766012342478905,
+        0.9915364765727996,
+        0.12898597018707028
+      ],
+      "vaultZ": 0.485,
+      "opticalAzDeg": 238.830877,
+      "opticalElDeg": 50.438554,
+      "lineToVaultAzDeg": 256.376966,
+      "lineToVaultElDeg": 61.855499,
+      "separationDeg": 14.931344,
+      "feLineAngles": {
+        "azimuth": 256.376966,
+        "elevation": 61.855499
+      },
+      "rayAtVaultZ": [
+        -0.436309,
+        -0.455683,
+        0.485
+      ],
+      "rayMode": "above-horizon",
+      "missDistance": 0.1721
+    }
   ]
 }
