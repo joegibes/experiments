@@ -5631,6 +5631,106 @@ export class GeocentricMarkers {
   }
 }
 
+
+// Straight-FE sightline debug overlay.
+//
+// Compares the app's current optical-vault marker with the optical-vault
+// position produced by drawing a literal FE line of sight from the observer
+// to the body's FE vault coordinate. The normal render path already draws the
+// current marker for sun/moon/planets/stars; this overlay repeats it in orange,
+// adds the straight-FE marker in magenta, and connects the two with a segment
+// so the angular/projection gap is visible without replacing the real marker.
+export class FeSightlineMarkers {
+  constructor(max = 4096) {
+    this.group = new THREE.Group();
+    this.group.name = 'fe-sightline-error-markers';
+    this._max = max;
+    this._appPos = new Float32Array(max * 3);
+    this._fePos  = new Float32Array(max * 3);
+    this._linePos = new Float32Array(max * 2 * 3);
+
+    const appGeom = new THREE.BufferGeometry();
+    appGeom.setAttribute('position', new THREE.BufferAttribute(this._appPos, 3));
+    appGeom.setDrawRange(0, 0);
+    this._appPoints = new THREE.Points(appGeom, new THREE.PointsMaterial({
+      color: 0xff8c00, size: 5, sizeAttenuation: false,
+      transparent: true, opacity: 0.95,
+      depthTest: false, depthWrite: false,
+    }));
+    this._appPoints.renderOrder = 70;
+    this._appPoints.frustumCulled = false;
+    this.group.add(this._appPoints);
+
+    const feGeom = new THREE.BufferGeometry();
+    feGeom.setAttribute('position', new THREE.BufferAttribute(this._fePos, 3));
+    feGeom.setDrawRange(0, 0);
+    this._fePoints = new THREE.Points(feGeom, new THREE.PointsMaterial({
+      color: 0xff40ff, size: 5, sizeAttenuation: false,
+      transparent: true, opacity: 0.95,
+      depthTest: false, depthWrite: false,
+    }));
+    this._fePoints.renderOrder = 71;
+    this._fePoints.frustumCulled = false;
+    this.group.add(this._fePoints);
+
+    const lineGeom = new THREE.BufferGeometry();
+    lineGeom.setAttribute('position', new THREE.BufferAttribute(this._linePos, 3));
+    lineGeom.setDrawRange(0, 0);
+    this._lines = new THREE.LineSegments(lineGeom, new THREE.LineBasicMaterial({
+      color: 0xff40ff, transparent: true, opacity: 0.85,
+      depthTest: false, depthWrite: false,
+    }));
+    this._lines.renderOrder = 69;
+    this._lines.frustumCulled = false;
+    this.group.add(this._lines);
+  }
+
+  update(model) {
+    const s = model.state;
+    const c = model.computed;
+    const on = !!s.ShowFeSightlineError && s.WorldModel !== 'ge' && s.ShowOpticalVault !== false;
+    if (!on) {
+      this._appPoints.geometry.setDrawRange(0, 0);
+      this._fePoints.geometry.setDrawRange(0, 0);
+      this._lines.geometry.setDrawRange(0, 0);
+      return;
+    }
+
+    const infos = c.TrackerInfos || [];
+    let n = 0;
+    for (const info of infos) {
+      if (n >= this._max) break;
+      if (Number.isFinite(info.elevation) && info.elevation < -3) continue;
+      const app = info.opticalVaultCoord;
+      const fe = info.feSightlineOpticalVaultCoord;
+      if (!app || !fe || app[2] === -1000 || fe[2] === -1000) continue;
+
+      this._appPos[n * 3]     = app[0];
+      this._appPos[n * 3 + 1] = app[1];
+      this._appPos[n * 3 + 2] = app[2];
+      this._fePos[n * 3]      = fe[0];
+      this._fePos[n * 3 + 1]  = fe[1];
+      this._fePos[n * 3 + 2]  = fe[2];
+
+      const li = n * 6;
+      this._linePos[li]     = app[0];
+      this._linePos[li + 1] = app[1];
+      this._linePos[li + 2] = app[2];
+      this._linePos[li + 3] = fe[0];
+      this._linePos[li + 4] = fe[1];
+      this._linePos[li + 5] = fe[2];
+      n++;
+    }
+
+    this._appPoints.geometry.attributes.position.needsUpdate = true;
+    this._fePoints.geometry.attributes.position.needsUpdate = true;
+    this._lines.geometry.attributes.position.needsUpdate = true;
+    this._appPoints.geometry.setDrawRange(0, n);
+    this._fePoints.geometry.setDrawRange(0, n);
+    this._lines.geometry.setDrawRange(0, n * 2);
+  }
+}
+
 // Central-angle / inscribed-angle helper for GE mode.
 //
 // Per `c.TrackerInfos` entry, draws a great-circle arc on the

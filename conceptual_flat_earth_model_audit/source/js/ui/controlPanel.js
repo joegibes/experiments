@@ -653,6 +653,7 @@ const FIELD_GROUPS = [
         { key: 'ShowVaultRays',        label: 'Vault Rays',         bool: true },
         { key: 'ShowOpticalVaultRays', label: 'Optical Vault Rays', bool: true },
         { key: 'ShowProjectionRays',   label: 'Projection Rays',    bool: true },
+        { key: 'ShowFeSightlineError', label: 'FE Sightline Error',  bool: true },
         { key: 'ShowManyRays',         label: 'Many Rays',          bool: true },
       ]},
       { title: 'Cosmology', rows: [
@@ -751,6 +752,7 @@ const FIELD_GROUPS = [
         { key: 'ShowSunTrack',         label: 'Sun Track',                bool: true },
         { key: 'ShowMoonTrack',        label: 'Moon Track',               bool: true },
         { key: 'ShowOpticalVaultGrid', label: 'Optical Vault Grid',       bool: true },
+        { key: 'ShowFeSightlineError', label: 'FE Sightline Error',       bool: true },
         { key: 'ShowAzimuthRing',      label: 'Azimuth ring',             bool: true },
         { key: 'ShowFacingVector',     label: 'Facing Vector / N-S-E-W',  bool: true },
         { key: 'ShowCelestialPoles',   label: 'Celestial Poles',          bool: true },
