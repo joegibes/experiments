@@ -1,0 +1,509 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Conceptual Flat Earth Model Pipeline Visualizer</title>
+  <style>
+    :root {
+      color-scheme: dark;
+      --bg: #071019;
+      --panel: rgba(15, 27, 42, 0.86);
+      --panel-2: rgba(22, 36, 54, 0.96);
+      --ink: #edf7ff;
+      --muted: #9fb5c9;
+      --line: rgba(160, 200, 255, 0.25);
+      --blue: #67d4ff;
+      --orange: #ffb347;
+      --green: #77e395;
+      --pink: #ff75bc;
+      --red: #ff6b6b;
+      --violet: #b49cff;
+      --yellow: #ffe27a;
+      font-family: Inter, ui-sans-serif, system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+    }
+
+    * { box-sizing: border-box; }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background:
+        radial-gradient(circle at 18% 12%, rgba(103, 212, 255, 0.16), transparent 28rem),
+        radial-gradient(circle at 88% 18%, rgba(255, 117, 188, 0.12), transparent 26rem),
+        linear-gradient(135deg, #050913 0%, var(--bg) 48%, #0e1726 100%);
+      color: var(--ink);
+    }
+
+    header {
+      padding: 1.4rem clamp(1rem, 3vw, 2.4rem) 0.8rem;
+      border-bottom: 1px solid var(--line);
+      background: rgba(4, 9, 16, 0.72);
+      backdrop-filter: blur(14px);
+      position: sticky;
+      top: 0;
+      z-index: 20;
+    }
+
+    h1 { margin: 0 0 0.35rem; font-size: clamp(1.4rem, 2.8vw, 2.25rem); }
+    p { color: var(--muted); line-height: 1.45; }
+    header p { margin: 0; max-width: 78rem; }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(20rem, 28rem) minmax(30rem, 1fr);
+      gap: 1rem;
+      padding: 1rem clamp(1rem, 3vw, 2.4rem) 2rem;
+    }
+
+    .panel {
+      background: var(--panel);
+      border: 1px solid var(--line);
+      border-radius: 18px;
+      box-shadow: 0 18px 60px rgba(0, 0, 0, 0.32);
+      overflow: hidden;
+    }
+
+    .controls { padding: 1rem; }
+    .control-row { display: grid; gap: 0.45rem; margin-bottom: 0.9rem; }
+    label { color: var(--muted); font-size: 0.88rem; font-weight: 700; letter-spacing: 0.02em; }
+    select, button, input[type="range"] { width: 100%; }
+    select, button {
+      color: var(--ink);
+      background: rgba(255, 255, 255, 0.07);
+      border: 1px solid rgba(255, 255, 255, 0.16);
+      border-radius: 12px;
+      padding: 0.62rem 0.75rem;
+      font: inherit;
+    }
+    button { cursor: pointer; font-weight: 800; transition: transform 0.15s ease, background 0.15s ease; }
+    button:hover { transform: translateY(-1px); background: rgba(103, 212, 255, 0.14); }
+    button.primary { background: linear-gradient(135deg, rgba(103, 212, 255, 0.28), rgba(180, 156, 255, 0.22)); }
+    .button-grid { display: grid; grid-template-columns: repeat(3, 1fr); gap: 0.5rem; }
+    .switch { display: flex; gap: 0.6rem; align-items: center; color: var(--ink); }
+    .switch input { width: auto; accent-color: var(--blue); }
+
+    .step-list { display: grid; gap: 0.45rem; padding: 0 1rem 1rem; }
+    .step-pill {
+      border: 1px solid var(--line);
+      border-radius: 12px;
+      padding: 0.65rem 0.75rem;
+      background: rgba(255, 255, 255, 0.045);
+      cursor: pointer;
+      display: grid;
+      gap: 0.18rem;
+    }
+    .step-pill.active { border-color: var(--blue); box-shadow: inset 3px 0 0 var(--blue); background: rgba(103, 212, 255, 0.11); }
+    .step-title { font-weight: 850; }
+    .step-kind { color: var(--muted); font-size: 0.8rem; }
+
+    .viz-wrap { display: grid; grid-template-rows: minmax(28rem, 58vh) auto; }
+    canvas { width: 100%; height: 100%; display: block; background: rgba(4, 9, 16, 0.58); }
+    .legend {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 0.55rem 1rem;
+      padding: 0.8rem 1rem;
+      border-top: 1px solid var(--line);
+      color: var(--muted);
+      font-size: 0.9rem;
+    }
+    .swatch { display: inline-flex; align-items: center; gap: 0.35rem; }
+    .dot { width: 0.75rem; height: 0.75rem; border-radius: 999px; display: inline-block; }
+
+    .details { padding: 1rem; display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap: 1rem; }
+    .card { background: var(--panel-2); border: 1px solid var(--line); border-radius: 16px; padding: 0.9rem; min-width: 0; }
+    .card h2 { margin: 0 0 0.55rem; font-size: 1rem; }
+    code, pre { font-family: "SFMono-Regular", Consolas, ui-monospace, monospace; }
+    pre {
+      white-space: pre-wrap;
+      word-break: break-word;
+      color: #d8efff;
+      background: rgba(0, 0, 0, 0.25);
+      border-radius: 10px;
+      padding: 0.7rem;
+      margin: 0;
+      font-size: 0.84rem;
+      line-height: 1.4;
+    }
+    .tag { display: inline-block; border-radius: 999px; padding: 0.22rem 0.55rem; font-size: 0.78rem; font-weight: 900; margin-bottom: 0.55rem; }
+    .tag.conventional { background: rgba(103, 212, 255, 0.16); color: var(--blue); }
+    .tag.fe { background: rgba(255, 179, 71, 0.18); color: var(--orange); }
+    .tag.display { background: rgba(119, 227, 149, 0.16); color: var(--green); }
+    .tag.audit { background: rgba(255, 117, 188, 0.16); color: var(--pink); }
+    .meta { color: var(--muted); padding: 0 1rem 1rem; font-size: 0.86rem; }
+
+    @media (max-width: 980px) {
+      main { grid-template-columns: 1fr; }
+      .details { grid-template-columns: 1fr; }
+      .viz-wrap { grid-template-rows: 56vh auto; }
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Pipeline Visualizer: Celestial Coordinates → FE Vault / Observer Sightlines</h1>
+    <p>Default data is loaded from <code>pipeline-sample-data.json</code>. Step through the audit pipeline, compare conventional spherical/globe transforms to flat-earth vault projections, and overlay the app optical direction against the straight FE line of sight.</p>
+  </header>
+
+  <main>
+    <aside class="panel">
+      <section class="controls">
+        <div class="control-row">
+          <label for="objectSelect">Object</label>
+          <select id="objectSelect"></select>
+        </div>
+        <div class="control-row">
+          <label for="stepRange">Pipeline step</label>
+          <input id="stepRange" type="range" min="0" max="7" value="0" />
+        </div>
+        <div class="button-grid">
+          <button id="prevBtn">◀ Prev</button>
+          <button class="primary" id="playBtn">Play</button>
+          <button id="nextBtn">Next ▶</button>
+        </div>
+        <div class="control-row" style="margin-top: 0.9rem;">
+          <label class="switch"><input id="overlayToggle" type="checkbox" checked /> Overlay app optical vs straight FE sightline</label>
+        </div>
+      </section>
+      <section id="stepList" class="step-list"></section>
+      <p id="datasetMeta" class="meta"></p>
+    </aside>
+
+    <section class="panel">
+      <div class="viz-wrap">
+        <canvas id="viz" width="1280" height="780" aria-label="Coordinate pipeline animation"></canvas>
+        <div class="legend">
+          <span class="swatch"><span class="dot" style="background: var(--yellow)"></span>Active output</span>
+          <span class="swatch"><span class="dot" style="background: var(--blue)"></span>Conventional/app optical</span>
+          <span class="swatch"><span class="dot" style="background: var(--orange)"></span>FE disc/vault</span>
+          <span class="swatch"><span class="dot" style="background: var(--pink)"></span>Straight FE sightline</span>
+          <span class="swatch"><span class="dot" style="background: var(--green)"></span>Observer</span>
+        </div>
+      </div>
+      <div class="details">
+        <article class="card">
+          <h2>Active formula</h2>
+          <span id="kindTag" class="tag"></span>
+          <pre id="formulaBox"></pre>
+        </article>
+        <article class="card">
+          <h2>Inputs</h2>
+          <pre id="inputBox"></pre>
+        </article>
+        <article class="card">
+          <h2>Outputs / audit values</h2>
+          <pre id="outputBox"></pre>
+        </article>
+      </div>
+    </section>
+  </main>
+
+  <script>
+    const DATA_URL = 'pipeline-sample-data.json';
+    const DEG = Math.PI / 180;
+    const STEPS = [
+      { title: '1. Source RA/Dec', kind: 'conventional', label: 'Conventional spherical/globe astronomy', formula: 'Source catalog / ephemeris values:\nα = right ascension (degrees)\nδ = declination (degrees)' },
+      { title: '2. RA/Dec → celestial unit vector', kind: 'conventional', label: 'Conventional spherical/globe astronomy', formula: 'celest = [cos δ cos α, cos δ sin α, sin δ]\nwhere α = RA and δ = Dec.' },
+      { title: '3. Sidereal rotation / GMST', kind: 'conventional', label: 'Conventional spherical/globe astronomy', formula: 'GMST = dataset.gmstDeg\nsubpoint longitude λ = normalize180(RA − GMST)\nlocal sidereal time LST = GMST + observer longitude.' },
+      { title: '4. Whole-world vault projection via vaultCoordAt', kind: 'fe', label: 'FE disc projection', formula: 'vaultCoordAt(lat, lon, z, R):\nr = R · (90 − lat) / 180\nx = r cos(lon)\ny = r sin(lon)\nz = dataset vault altitude.' },
+      { title: '5. Observer local-sky transform via compTransMatCelestToGlobe', kind: 'conventional', label: 'Conventional spherical/globe astronomy', formula: 'compTransMatCelestToGlobe(lat, lon, GMST):\nfirst = RotZ(−lon − GMST)\nM = RotY(lat) · first\nlocalGlobe = M · celest.' },
+      { title: '6. Optical-vault projection via opticalVaultProject', kind: 'display', label: 'Display-only scaling', formula: 'opticalVaultProject(localGlobe, R, H):\noptical = [localGlobe.x · H, localGlobe.y · R, localGlobe.z · R]\nThe app uses this scaled optical direction for the vault display.' },
+      { title: '7. Straight FE observer-to-vault sightline via feConceptualLocalGlobeUnit', kind: 'fe', label: 'FE disc projection', formula: 'ray = normalize(vaultGlobalFE − observerGlobalFE)\nthen inverse local-FE rotation and axis swap:\nlocal-globe = [up, east, north].' },
+      { title: '8. Angular separation / miss-distance', kind: 'audit', label: 'Audit comparison', formula: 'separation = acos(dot(opticalUnit, feSightlineUnit))\nmiss distance = |intersection of optical ray at vault z − vault coordinate|.' },
+    ];
+
+    const $ = (id) => document.getElementById(id);
+    const canvas = $('viz');
+    const ctx = canvas.getContext('2d');
+    let data, bodies = [], activeBody, activeStep = 0, playing = false, playTimer = null;
+    let cachedCompute = null, cachedInfo = null;
+    let anim = { from: null, to: null, start: performance.now(), duration: 720 };
+
+    function clamp(x, lo, hi) { return Math.max(lo, Math.min(hi, x)); }
+    function norm180(x) { return ((((x + 180) % 360) + 360) % 360) - 180; }
+    function fmt(n, digits = 6) { return Number.isFinite(n) ? Number(n).toFixed(digits).replace(/\.?0+$/, '') : String(n); }
+    function fmtDeg(n) { return `${fmt(n, 6)}°`; }
+    function vec(v, digits = 6) { return `[${(v || []).map(n => fmt(n, digits)).join(', ')}]`; }
+    function len(v) { return Math.hypot(v[0], v[1], v[2]); }
+    function unit(v) { const L = len(v); return L < 1e-12 ? [0,0,0] : v.map(x => x / L); }
+    function dot(a, b) { return a[0]*b[0] + a[1]*b[1] + a[2]*b[2]; }
+    function fromAngle(longDeg, latDeg, length = 1) {
+      const lo = longDeg * DEG, la = latDeg * DEG, c = Math.cos(la);
+      return [length * c * Math.cos(lo), length * c * Math.sin(lo), length * Math.sin(la)];
+    }
+    function rotZ(a) { const c = Math.cos(a), s = Math.sin(a); return [[c,-s,0],[s,c,0],[0,0,1]]; }
+    function rotY(a) { const c = Math.cos(a), s = Math.sin(a); return [[c,0,s],[0,1,0],[-s,0,c]]; }
+    function mul3(A, B) {
+      return A.map((row, i) => B[0].map((_, j) => row[0]*B[0][j] + row[1]*B[1][j] + row[2]*B[2][j]));
+    }
+    function trans(R, v) { return [R[0][0]*v[0]+R[0][1]*v[1]+R[0][2]*v[2], R[1][0]*v[0]+R[1][1]*v[1]+R[1][2]*v[2], R[2][0]*v[0]+R[2][1]*v[1]+R[2][2]*v[2]]; }
+    function canonicalLatLongToDisc(latDeg, lonDeg, R = 1) {
+      const r = R * (90 - latDeg) / 180;
+      const lo = lonDeg * DEG;
+      return [r * Math.cos(lo), r * Math.sin(lo), 0];
+    }
+    function vaultCoordAt(latDeg, lonDeg, z, R = 1) {
+      const p = canonicalLatLongToDisc(latDeg, lonDeg, R);
+      return [p[0], p[1], z];
+    }
+    function compTransMatCelestToGlobe(obsLatDeg, obsLongDeg, skyRotAngleDeg) {
+      return mul3(rotY(obsLatDeg * DEG), rotZ((-obsLongDeg - skyRotAngleDeg) * DEG));
+    }
+    function compTransMatLocalFeToGlobalFe(observerCoord, lonDeg) {
+      const lr = lonDeg * DEG, cl = Math.cos(lr), sl = Math.sin(lr);
+      return { r: [[cl, -sl, 0], [sl, cl, 0], [0, 0, 1]], t: observerCoord };
+    }
+    function feConceptualLocalGlobeUnit(vaultGlobalFe, observerGlobalFe, m) {
+      const dx = vaultGlobalFe[0] - observerGlobalFe[0], dy = vaultGlobalFe[1] - observerGlobalFe[1], dz = vaultGlobalFe[2] - observerGlobalFe[2];
+      const r = m.r;
+      const lfX = r[0][0] * dx + r[1][0] * dy + r[2][0] * dz;
+      const lfY = r[0][1] * dx + r[1][1] * dy + r[2][1] * dz;
+      const lfZ = r[0][2] * dx + r[1][2] * dy + r[2][2] * dz;
+      return unit([lfZ, lfY, -lfX]);
+    }
+    function localGlobeCoordToAngles(coord) {
+      const n = unit(coord), yz = Math.hypot(n[1], n[2]);
+      const elevation = Math.asin(clamp(n[0], -1, 1)) / DEG;
+      let azimuth = yz < 1e-12 ? 0 : Math.atan2(n[1], n[2]) / DEG;
+      azimuth = ((azimuth % 360) + 360) % 360;
+      return { azimuth, elevation };
+    }
+    function opticalVaultProject(localGlobe, R = 1, H = 1) { return [localGlobe[0] * H, localGlobe[1] * R, localGlobe[2] * R]; }
+
+    function compute(body) {
+      const obs = data.observer;
+      const ra = body.raDeg, dec = body.decDeg, gmst = data.gmstDeg;
+      const celest = fromAngle(ra, dec, 1);
+      const gpLon = norm180(ra - gmst);
+      const lst = ((gmst + obs.lonDeg) % 360 + 360) % 360;
+      const hourAngle = norm180(lst - ra);
+      const vault = vaultCoordAt(dec, gpLon, body.vaultZ ?? (body.vaultCoord ? body.vaultCoord[2] : 0));
+      const M = compTransMatCelestToGlobe(obs.latDeg, obs.lonDeg, gmst);
+      const localGlobe = trans(M, celest);
+      const optical = opticalVaultProject(localGlobe, 1, 1);
+      const observerFe = data.observerFeCoord || canonicalLatLongToDisc(obs.latDeg, obs.lonDeg);
+      const localFeMat = compTransMatLocalFeToGlobalFe(observerFe, obs.lonDeg);
+      const feSightline = body.feLocalGlobeUnit || feConceptualLocalGlobeUnit(body.vaultCoord || vault, observerFe, localFeMat);
+      const opticalUnit = unit(body.opticalLocalGlobe || localGlobe);
+      const feUnit = unit(feSightline);
+      const separation = Math.acos(clamp(dot(opticalUnit, feUnit), -1, 1)) / DEG;
+      return { obs, ra, dec, gmst, celest, gpLon, lst, hourAngle, vault, M, localGlobe, optical, observerFe, localFeMat, opticalUnit, feUnit, opticalAngles: localGlobeCoordToAngles(opticalUnit), feAngles: localGlobeCoordToAngles(feUnit), separation };
+    }
+
+    function stepInfo(body, c) {
+      const storedVault = body.vaultCoord || c.vault;
+      const storedOpt = body.opticalLocalGlobe || c.localGlobe;
+      const storedFeAz = body.feLineAngles?.azimuth ?? body.lineToVaultAzDeg ?? c.feAngles.azimuth;
+      const storedFeEl = body.feLineAngles?.elevation ?? body.lineToVaultElDeg ?? c.feAngles.elevation;
+      const baseInputs = `object: ${body.label}
+dateIso: ${data.dateIso}
+observer: lat ${fmtDeg(c.obs.latDeg)}, lon ${fmtDeg(c.obs.lonDeg)}`;
+
+      switch (activeStep) {
+        case 0:
+          return {
+            inputs: `${baseInputs}
+RA α: ${fmtDeg(c.ra)}
+Dec δ: ${fmtDeg(c.dec)}`,
+            outputs: `source α, δ = (${fmtDeg(c.ra)}, ${fmtDeg(c.dec)})
+category: ${body.category || 'n/a'}`,
+            point: fromAngle(c.ra, c.dec, 0.82), frame: 'celestial sphere'
+          };
+        case 1:
+          return {
+            inputs: `α = ${fmtDeg(c.ra)}
+δ = ${fmtDeg(c.dec)}`,
+            outputs: `computed celestial unit = ${vec(c.celest)}
+sample celestCoord = ${body.celestCoord ? vec(body.celestCoord) : 'not stored for this body'}`,
+            point: c.celest, frame: 'celestial unit vector'
+          };
+        case 2:
+          return {
+            inputs: `GMST: ${fmtDeg(c.gmst)}
+observer lon: ${fmtDeg(c.obs.lonDeg)}
+RA: ${fmtDeg(c.ra)}`,
+            outputs: `GP longitude RA − GMST = ${fmtDeg(c.gpLon)}
+LST = ${fmtDeg(c.lst)}
+hour angle = ${fmtDeg(c.hourAngle)}`,
+            point: fromAngle(c.gpLon, c.dec, 0.82), frame: 'earth-fixed subpoint after GMST'
+          };
+        case 3:
+          return {
+            inputs: `lat = Dec = ${fmtDeg(c.dec)}
+lon = RA − GMST = ${fmtDeg(c.gpLon)}
+z = ${fmt(body.vaultZ ?? storedVault[2])}`,
+            outputs: `computed vaultCoordAt = ${vec(c.vault)}
+sample vaultCoord = ${vec(storedVault)}
+operation: maps the whole world into FE disc x/y and keeps stored vault height.`,
+            point: storedVault, frame: 'global FE vault'
+          };
+        case 4:
+          return {
+            inputs: `observer lat/lon = ${fmtDeg(c.obs.latDeg)}, ${fmtDeg(c.obs.lonDeg)}
+GMST = ${fmtDeg(c.gmst)}
+celestial unit = ${vec(c.celest)}`,
+            outputs: `local-globe unit = ${vec(storedOpt)}
+app optical az/el = ${fmtDeg(body.opticalAzDeg ?? c.opticalAngles.azimuth)}, ${fmtDeg(body.opticalElDeg ?? c.opticalAngles.elevation)}
+computed az/el = ${fmtDeg(c.opticalAngles.azimuth)}, ${fmtDeg(c.opticalAngles.elevation)}`,
+            point: storedOpt, frame: 'observer local sky'
+          };
+        case 5:
+          return {
+            inputs: `localGlobe = ${vec(storedOpt)}
+R = 1, H = 1 in this normalized visualizer`,
+            outputs: `optical projected vector = ${vec(c.optical)}
+angles remain az/el = ${fmtDeg(body.opticalAzDeg ?? c.opticalAngles.azimuth)}, ${fmtDeg(body.opticalElDeg ?? c.opticalAngles.elevation)}
+classification: display scaling of app direction, not a physical straight line to vaultCoord.`,
+            point: c.optical, frame: 'optical-vault display projection'
+          };
+        case 6:
+          return {
+            inputs: `observerGlobalFE = ${vec(c.observerFe)}
+vaultGlobalFE = ${vec(storedVault)}
+local-FE frame from observer longitude ${fmtDeg(c.obs.lonDeg)}`,
+            outputs: `straight FE local-globe unit = ${vec(c.feUnit)}
+line-to-vault az/el = ${fmtDeg(storedFeAz)}, ${fmtDeg(storedFeEl)}
+ray mode: ${body.rayMode || 'n/a'}`,
+            point: c.feUnit, frame: 'straight FE sightline'
+          };
+        case 7:
+        default:
+          return {
+            inputs: `optical unit = ${vec(c.opticalUnit)}
+FE sightline unit = ${vec(c.feUnit)}
+rayAtVaultZ = ${body.rayAtVaultZ ? vec(body.rayAtVaultZ) : 'not stored'}`,
+            outputs: `angular separation = ${fmtDeg(body.separationDeg ?? c.separation)}
+computed separation = ${fmtDeg(c.separation)}
+miss distance = ${fmt(body.missDistance)} FE-radius units
+This is the audit delta between app optical direction and straight observer→vault direction.`,
+            point: [Math.cos((body.separationDeg ?? c.separation) * DEG), Math.sin((body.separationDeg ?? c.separation) * DEG), 0], frame: 'comparison metric'
+          };
+      }
+    }
+
+    function projectPoint(p, frame) {
+      const w = canvas.width, h = canvas.height;
+      const cx = w * 0.52, cy = h * 0.50;
+      let scale = Math.min(w, h) * 0.36;
+      let x = p[0], y = p[1], z = p[2] || 0;
+      if (frame && frame.includes('FE vault')) scale = Math.min(w, h) * 0.62;
+      if (frame && frame.includes('comparison')) return { x: cx + x * scale * 0.42, y: cy - y * scale * 0.42 };
+      return { x: cx + (x - y * 0.22) * scale, y: cy - (z * 0.72 + y * 0.52) * scale };
+    }
+
+    function drawGrid(frame) {
+      const w = canvas.width, h = canvas.height;
+      ctx.clearRect(0, 0, w, h);
+      ctx.save();
+      ctx.strokeStyle = 'rgba(160,200,255,0.15)';
+      ctx.lineWidth = 1;
+      const cx = w * 0.52, cy = h * 0.50, r = Math.min(w, h) * 0.31;
+      for (let rr = 0.25; rr <= 1; rr += 0.25) {
+        ctx.beginPath(); ctx.ellipse(cx, cy, r * rr, r * rr * 0.52, 0, 0, Math.PI * 2); ctx.stroke();
+      }
+      for (let a = 0; a < 360; a += 30) {
+        const p = projectPoint(fromAngle(a, 0, 1), frame);
+        ctx.beginPath(); ctx.moveTo(cx, cy); ctx.lineTo(p.x, p.y); ctx.stroke();
+      }
+      ctx.fillStyle = 'rgba(237,247,255,0.82)';
+      ctx.font = '700 18px Inter, sans-serif';
+      ctx.fillText(frame || 'frame', 28, 40);
+      ctx.fillStyle = 'rgba(159,181,201,0.9)';
+      ctx.font = '14px Inter, sans-serif';
+      ctx.fillText('Animated point morphs from the previous pipeline frame into the current frame.', 28, 64);
+      ctx.restore();
+    }
+
+    function drawArrow(a, color, label, frame, radius = 1) {
+      const p0 = projectPoint([0,0,0], frame), p1 = projectPoint([a[0]*radius, a[1]*radius, a[2]*radius], frame);
+      ctx.save();
+      ctx.strokeStyle = color; ctx.fillStyle = color; ctx.lineWidth = 4;
+      ctx.beginPath(); ctx.moveTo(p0.x, p0.y); ctx.lineTo(p1.x, p1.y); ctx.stroke();
+      ctx.beginPath(); ctx.arc(p1.x, p1.y, 6, 0, Math.PI * 2); ctx.fill();
+      ctx.font = '800 14px Inter, sans-serif'; ctx.fillText(label, p1.x + 10, p1.y - 10);
+      ctx.restore();
+    }
+
+    function draw() {
+      if (!activeBody || !cachedCompute || !cachedInfo) return;
+      const c = cachedCompute;
+      const info = cachedInfo;
+      drawGrid(info.frame);
+      const now = performance.now();
+      const t = clamp((now - anim.start) / anim.duration, 0, 1);
+      const ease = t < 0.5 ? 2*t*t : 1 - Math.pow(-2*t + 2, 2) / 2;
+      const from = anim.from || info.point, to = anim.to || info.point;
+      const p = [0,1,2].map(i => from[i] + (to[i] - from[i]) * ease);
+
+      if (info.frame.includes('FE')) {
+        const obs = projectPoint(c.observerFe, info.frame);
+        ctx.fillStyle = '#77e395'; ctx.beginPath(); ctx.arc(obs.x, obs.y, 8, 0, Math.PI*2); ctx.fill();
+        ctx.fillText('observer', obs.x + 10, obs.y + 4);
+      }
+      if ($('overlayToggle').checked) {
+        drawArrow(c.opticalUnit, '#67d4ff', 'app optical', info.frame, 0.75);
+        drawArrow(c.feUnit, '#ff75bc', 'straight FE', info.frame, 0.88);
+      }
+      const pp = projectPoint(p, info.frame);
+      ctx.save();
+      ctx.shadowBlur = 24; ctx.shadowColor = '#ffe27a'; ctx.fillStyle = '#ffe27a';
+      ctx.beginPath(); ctx.arc(pp.x, pp.y, 11, 0, Math.PI * 2); ctx.fill();
+      ctx.shadowBlur = 0; ctx.strokeStyle = 'rgba(255,226,122,0.55)'; ctx.lineWidth = 2;
+      ctx.beginPath(); ctx.arc(pp.x, pp.y, 20 + 6 * Math.sin(now / 170), 0, Math.PI * 2); ctx.stroke();
+      ctx.fillStyle = '#edf7ff'; ctx.font = '900 15px Inter, sans-serif'; ctx.fillText(activeBody.label, pp.x + 14, pp.y + 5);
+      ctx.restore();
+      requestAnimationFrame(draw);
+    }
+
+    function updateUI(animate = true) {
+      cachedCompute = compute(activeBody);
+      cachedInfo = stepInfo(activeBody, cachedCompute);
+      const info = cachedInfo;
+      const previousTo = anim.to || info.point;
+      anim = { from: animate ? previousTo : info.point, to: info.point, start: performance.now(), duration: 720 };
+      $('stepRange').value = activeStep;
+      [...document.querySelectorAll('.step-pill')].forEach((el, i) => el.classList.toggle('active', i === activeStep));
+      const s = STEPS[activeStep];
+      $('kindTag').className = `tag ${s.kind}`;
+      $('kindTag').textContent = s.label;
+      $('formulaBox').textContent = s.formula;
+      $('inputBox').textContent = info.inputs;
+      $('outputBox').textContent = info.outputs;
+    }
+
+    function setStep(n) { activeStep = (n + STEPS.length) % STEPS.length; updateUI(true); }
+    function startStop() {
+      playing = !playing;
+      $('playBtn').textContent = playing ? 'Pause' : 'Play';
+      if (playing) playTimer = setInterval(() => setStep(activeStep + 1), 1900);
+      else clearInterval(playTimer);
+    }
+
+    async function init() {
+      data = await fetch(DATA_URL).then(r => {
+        if (!r.ok) throw new Error(`Could not load ${DATA_URL}: ${r.status}`);
+        return r.json();
+      });
+      bodies = data.bodies;
+      $('objectSelect').innerHTML = bodies.map((b, i) => `<option value="${i}">${b.label}</option>`).join('');
+      activeBody = bodies[0];
+      $('datasetMeta').textContent = `Dataset: ${data.dateIso}; observer ${data.observer.latDeg}°, ${data.observer.lonDeg}°; GMST ${fmtDeg(data.gmstDeg)}.`;
+      $('stepList').innerHTML = STEPS.map((s, i) => `<div class="step-pill" data-step="${i}"><span class="step-title">${s.title}</span><span class="step-kind">${s.label}</span></div>`).join('');
+      $('objectSelect').addEventListener('change', (e) => { activeBody = bodies[Number(e.target.value)]; updateUI(true); });
+      $('stepRange').addEventListener('input', (e) => setStep(Number(e.target.value)));
+      $('prevBtn').addEventListener('click', () => setStep(activeStep - 1));
+      $('nextBtn').addEventListener('click', () => setStep(activeStep + 1));
+      $('playBtn').addEventListener('click', startStop);
+      $('overlayToggle').addEventListener('change', () => updateUI(false));
+      $('stepList').addEventListener('click', (e) => { const pill = e.target.closest('.step-pill'); if (pill) setStep(Number(pill.dataset.step)); });
+      updateUI(false);
+      requestAnimationFrame(draw);
+    }
+
+    init().catch(err => {
+      document.body.innerHTML = `<main style="display:block"><section class="panel controls"><h1>Could not load visualizer data</h1><p>${err.message}</p><p>Serve this folder with a local web server so the browser can fetch <code>${DATA_URL}</code>, for example: <code>python3 -m http.server</code>.</p></section></main>`;
+    });
+  </script>
+</body>
+</html>
