@@ -217,6 +217,7 @@
     const canvas = $('viz');
     const ctx = canvas.getContext('2d');
     let data, bodies = [], activeBody, activeStep = 0, playing = false, playTimer = null;
+    let cachedCompute = null, cachedInfo = null;
     let anim = { from: null, to: null, start: performance.now(), duration: 720 };
 
     function clamp(x, lo, hi) { return Math.max(lo, Math.min(hi, x)); }
@@ -295,50 +296,90 @@
       const storedOpt = body.opticalLocalGlobe || c.localGlobe;
       const storedFeAz = body.feLineAngles?.azimuth ?? body.lineToVaultAzDeg ?? c.feAngles.azimuth;
       const storedFeEl = body.feLineAngles?.elevation ?? body.lineToVaultElDeg ?? c.feAngles.elevation;
-      const baseInputs = `object: ${body.label}\ndateIso: ${data.dateIso}\nobserver: lat ${fmtDeg(c.obs.latDeg)}, lon ${fmtDeg(c.obs.lonDeg)}`;
-      const rows = [
-        {
-          inputs: `${baseInputs}\nRA α: ${fmtDeg(c.ra)}\nDec δ: ${fmtDeg(c.dec)}`,
-          outputs: `source α, δ = (${fmtDeg(c.ra)}, ${fmtDeg(c.dec)})\ncategory: ${body.category || 'n/a'}`,
-          point: fromAngle(c.ra, c.dec, 0.82), frame: 'celestial sphere'
-        },
-        {
-          inputs: `α = ${fmtDeg(c.ra)}\nδ = ${fmtDeg(c.dec)}`,
-          outputs: `computed celestial unit = ${vec(c.celest)}\nsample celestCoord = ${body.celestCoord ? vec(body.celestCoord) : 'not stored for this body'}`,
-          point: c.celest, frame: 'celestial unit vector'
-        },
-        {
-          inputs: `GMST: ${fmtDeg(c.gmst)}\nobserver lon: ${fmtDeg(c.obs.lonDeg)}\nRA: ${fmtDeg(c.ra)}`,
-          outputs: `GP longitude RA − GMST = ${fmtDeg(c.gpLon)}\nLST = ${fmtDeg(c.lst)}\nhour angle = ${fmtDeg(c.hourAngle)}`,
-          point: fromAngle(c.gpLon, c.dec, 0.82), frame: 'earth-fixed subpoint after GMST'
-        },
-        {
-          inputs: `lat = Dec = ${fmtDeg(c.dec)}\nlon = RA − GMST = ${fmtDeg(c.gpLon)}\nz = ${fmt(body.vaultZ ?? storedVault[2])}`,
-          outputs: `computed vaultCoordAt = ${vec(c.vault)}\nsample vaultCoord = ${vec(storedVault)}\noperation: maps the whole world into FE disc x/y and keeps stored vault height.` ,
-          point: storedVault, frame: 'global FE vault'
-        },
-        {
-          inputs: `observer lat/lon = ${fmtDeg(c.obs.latDeg)}, ${fmtDeg(c.obs.lonDeg)}\nGMST = ${fmtDeg(c.gmst)}\ncelestial unit = ${vec(c.celest)}`,
-          outputs: `local-globe unit = ${vec(storedOpt)}\napp optical az/el = ${fmtDeg(body.opticalAzDeg ?? c.opticalAngles.azimuth)}, ${fmtDeg(body.opticalElDeg ?? c.opticalAngles.elevation)}\ncomputed az/el = ${fmtDeg(c.opticalAngles.azimuth)}, ${fmtDeg(c.opticalAngles.elevation)}`,
-          point: storedOpt, frame: 'observer local sky'
-        },
-        {
-          inputs: `localGlobe = ${vec(storedOpt)}\nR = 1, H = 1 in this normalized visualizer` ,
-          outputs: `optical projected vector = ${vec(c.optical)}\nangles remain az/el = ${fmtDeg(body.opticalAzDeg ?? c.opticalAngles.azimuth)}, ${fmtDeg(body.opticalElDeg ?? c.opticalAngles.elevation)}\nclassification: display scaling of app direction, not a physical straight line to vaultCoord.` ,
-          point: c.optical, frame: 'optical-vault display projection'
-        },
-        {
-          inputs: `observerGlobalFE = ${vec(c.observerFe)}\nvaultGlobalFE = ${vec(storedVault)}\nlocal-FE frame from observer longitude ${fmtDeg(c.obs.lonDeg)}`,
-          outputs: `straight FE local-globe unit = ${vec(c.feUnit)}\nline-to-vault az/el = ${fmtDeg(storedFeAz)}, ${fmtDeg(storedFeEl)}\nray mode: ${body.rayMode || 'n/a'}`,
-          point: c.feUnit, frame: 'straight FE sightline'
-        },
-        {
-          inputs: `optical unit = ${vec(c.opticalUnit)}\nFE sightline unit = ${vec(c.feUnit)}\nrayAtVaultZ = ${body.rayAtVaultZ ? vec(body.rayAtVaultZ) : 'not stored'}`,
-          outputs: `angular separation = ${fmtDeg(body.separationDeg ?? c.separation)}\ncomputed separation = ${fmtDeg(c.separation)}\nmiss distance = ${fmt(body.missDistance)} FE-radius units\nThis is the audit delta between app optical direction and straight observer→vault direction.` ,
-          point: [Math.cos((body.separationDeg ?? c.separation) * DEG), Math.sin((body.separationDeg ?? c.separation) * DEG), 0], frame: 'comparison metric'
-        },
-      ];
-      return rows[activeStep];
+      const baseInputs = `object: ${body.label}
+dateIso: ${data.dateIso}
+observer: lat ${fmtDeg(c.obs.latDeg)}, lon ${fmtDeg(c.obs.lonDeg)}`;
+
+      switch (activeStep) {
+        case 0:
+          return {
+            inputs: `${baseInputs}
+RA α: ${fmtDeg(c.ra)}
+Dec δ: ${fmtDeg(c.dec)}`,
+            outputs: `source α, δ = (${fmtDeg(c.ra)}, ${fmtDeg(c.dec)})
+category: ${body.category || 'n/a'}`,
+            point: fromAngle(c.ra, c.dec, 0.82), frame: 'celestial sphere'
+          };
+        case 1:
+          return {
+            inputs: `α = ${fmtDeg(c.ra)}
+δ = ${fmtDeg(c.dec)}`,
+            outputs: `computed celestial unit = ${vec(c.celest)}
+sample celestCoord = ${body.celestCoord ? vec(body.celestCoord) : 'not stored for this body'}`,
+            point: c.celest, frame: 'celestial unit vector'
+          };
+        case 2:
+          return {
+            inputs: `GMST: ${fmtDeg(c.gmst)}
+observer lon: ${fmtDeg(c.obs.lonDeg)}
+RA: ${fmtDeg(c.ra)}`,
+            outputs: `GP longitude RA − GMST = ${fmtDeg(c.gpLon)}
+LST = ${fmtDeg(c.lst)}
+hour angle = ${fmtDeg(c.hourAngle)}`,
+            point: fromAngle(c.gpLon, c.dec, 0.82), frame: 'earth-fixed subpoint after GMST'
+          };
+        case 3:
+          return {
+            inputs: `lat = Dec = ${fmtDeg(c.dec)}
+lon = RA − GMST = ${fmtDeg(c.gpLon)}
+z = ${fmt(body.vaultZ ?? storedVault[2])}`,
+            outputs: `computed vaultCoordAt = ${vec(c.vault)}
+sample vaultCoord = ${vec(storedVault)}
+operation: maps the whole world into FE disc x/y and keeps stored vault height.`,
+            point: storedVault, frame: 'global FE vault'
+          };
+        case 4:
+          return {
+            inputs: `observer lat/lon = ${fmtDeg(c.obs.latDeg)}, ${fmtDeg(c.obs.lonDeg)}
+GMST = ${fmtDeg(c.gmst)}
+celestial unit = ${vec(c.celest)}`,
+            outputs: `local-globe unit = ${vec(storedOpt)}
+app optical az/el = ${fmtDeg(body.opticalAzDeg ?? c.opticalAngles.azimuth)}, ${fmtDeg(body.opticalElDeg ?? c.opticalAngles.elevation)}
+computed az/el = ${fmtDeg(c.opticalAngles.azimuth)}, ${fmtDeg(c.opticalAngles.elevation)}`,
+            point: storedOpt, frame: 'observer local sky'
+          };
+        case 5:
+          return {
+            inputs: `localGlobe = ${vec(storedOpt)}
+R = 1, H = 1 in this normalized visualizer`,
+            outputs: `optical projected vector = ${vec(c.optical)}
+angles remain az/el = ${fmtDeg(body.opticalAzDeg ?? c.opticalAngles.azimuth)}, ${fmtDeg(body.opticalElDeg ?? c.opticalAngles.elevation)}
+classification: display scaling of app direction, not a physical straight line to vaultCoord.`,
+            point: c.optical, frame: 'optical-vault display projection'
+          };
+        case 6:
+          return {
+            inputs: `observerGlobalFE = ${vec(c.observerFe)}
+vaultGlobalFE = ${vec(storedVault)}
+local-FE frame from observer longitude ${fmtDeg(c.obs.lonDeg)}`,
+            outputs: `straight FE local-globe unit = ${vec(c.feUnit)}
+line-to-vault az/el = ${fmtDeg(storedFeAz)}, ${fmtDeg(storedFeEl)}
+ray mode: ${body.rayMode || 'n/a'}`,
+            point: c.feUnit, frame: 'straight FE sightline'
+          };
+        case 7:
+        default:
+          return {
+            inputs: `optical unit = ${vec(c.opticalUnit)}
+FE sightline unit = ${vec(c.feUnit)}
+rayAtVaultZ = ${body.rayAtVaultZ ? vec(body.rayAtVaultZ) : 'not stored'}`,
+            outputs: `angular separation = ${fmtDeg(body.separationDeg ?? c.separation)}
+computed separation = ${fmtDeg(c.separation)}
+miss distance = ${fmt(body.missDistance)} FE-radius units
+This is the audit delta between app optical direction and straight observer→vault direction.`,
+            point: [Math.cos((body.separationDeg ?? c.separation) * DEG), Math.sin((body.separationDeg ?? c.separation) * DEG), 0], frame: 'comparison metric'
+          };
+      }
     }
 
     function projectPoint(p, frame) {
@@ -385,9 +426,9 @@
     }
 
     function draw() {
-      if (!activeBody) return;
-      const c = compute(activeBody);
-      const info = stepInfo(activeBody, c);
+      if (!activeBody || !cachedCompute || !cachedInfo) return;
+      const c = cachedCompute;
+      const info = cachedInfo;
       drawGrid(info.frame);
       const now = performance.now();
       const t = clamp((now - anim.start) / anim.duration, 0, 1);
@@ -416,8 +457,9 @@
     }
 
     function updateUI(animate = true) {
-      const c = compute(activeBody);
-      const info = stepInfo(activeBody, c);
+      cachedCompute = compute(activeBody);
+      cachedInfo = stepInfo(activeBody, cachedCompute);
+      const info = cachedInfo;
       const previousTo = anim.to || info.point;
       anim = { from: animate ? previousTo : info.point, to: info.point, start: performance.now(), duration: 720 };
       $('stepRange').value = activeStep;
